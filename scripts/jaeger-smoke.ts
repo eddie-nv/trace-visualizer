@@ -26,7 +26,7 @@ async function emitSmokeSpan(): Promise<void> {
   const exporter = new OTLPTraceExporter({ url: `${OTLP_ENDPOINT}/v1/traces` });
   const provider = new BasicTracerProvider({
     resource: resourceFromAttributes({ "service.name": SERVICE_NAME }),
-    spanProcessors: [new SimpleSpanProcessor(exporter)]
+    spanProcessors: [new SimpleSpanProcessor(exporter)],
   });
   const tracer = provider.getTracer("agentgraph-smoke");
 
@@ -56,7 +56,7 @@ async function pollForSmokeSpan(): Promise<boolean> {
   while (Date.now() < deadline) {
     const body = await querySmokeTraces();
     const hasSmokeSpan = body?.data.some((trace) =>
-      trace.spans.some((span) => span.operationName === SPAN_NAME)
+      trace.spans.some((span) => span.operationName === SPAN_NAME),
     );
     if (hasSmokeSpan) {
       return true;
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
   if (!isVisible) {
     console.error(
       `jaeger smoke FAIL: span "${SPAN_NAME}" for service "${SERVICE_NAME}" not found at ` +
-        `${JAEGER_QUERY_URL} within ${POLL_TIMEOUT_MS}ms (is Jaeger up? try: npm run jaeger:up)`
+        `${JAEGER_QUERY_URL} within ${POLL_TIMEOUT_MS}ms (is Jaeger up? try: npm run jaeger:up)`,
     );
     process.exit(1);
   }
