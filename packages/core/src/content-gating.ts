@@ -2,7 +2,13 @@ import { context, createContextKey, type Context } from "@opentelemetry/api";
 
 /** Configuration shared by every core emission path. */
 export interface CoreConfig {
-  /** Capture message content on spans. Default true (DESIGN §4). */
+  /**
+   * Capture message content on spans. Default true (DESIGN §4).
+   *
+   * `false` forces content off; `true` is NOT force-on — the
+   * `AGENTGRAPH_TRACE_CONTENT=false` env kill switch still wins. Only the
+   * {@link ALLOW_TRACE_CONTENT_KEY} context override forces content on.
+   */
   traceContent?: boolean;
 }
 

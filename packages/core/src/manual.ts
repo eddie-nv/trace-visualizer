@@ -5,7 +5,7 @@ import { TRACER_NAME } from "./tracer.js";
 
 export type LLMOperation = "chat" | "text_completion";
 
-const LLM_OPERATIONS: readonly string[] = ["chat", "text_completion"];
+const LLM_OPERATIONS: readonly LLMOperation[] = ["chat", "text_completion"];
 
 export interface LLMCallAttributes {
   provider: string;
@@ -34,7 +34,13 @@ export interface LLMSpanResponse {
   readonly finishReasons?: readonly string[];
 }
 
-/** Returned by {@link LLMSpan.reportRequest}; response can only follow request. */
+/**
+ * Returned by {@link LLMSpan.reportRequest}; response can only follow request.
+ *
+ * Call `reportResponse` before the `withLLMCall` callback settles — the span
+ * ends when the callback does, and attributes written to an ended span are
+ * dropped by the OTel SDK.
+ */
 export interface LLMSpanAfterRequest {
   reportResponse(res: LLMSpanResponse): void;
 }
@@ -79,8 +85,10 @@ export function withLLMCall<T>(
       let isRequestReported = false;
       const llmSpan: LLMSpan = {
         reportRequest(req) {
-          applyRequest(span, attrs.operation, req);
+          // Mark intent before validating so a rejected reportRequest does not
+          // also stamp the misleading "reportRequest not called" warning.
           isRequestReported = true;
+          applyRequest(span, attrs.operation, req);
           return {
             reportResponse(res) {
               applyResponse(span, res);

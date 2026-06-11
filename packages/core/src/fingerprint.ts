@@ -1,3 +1,5 @@
+// node:crypto is implemented by both Node and Bun (the only supported
+// runtimes, DESIGN §0); browser bundles are an explicit non-goal.
 import { createHash } from "node:crypto";
 
 /** Request-visible signals that identify an unconfigured agent. */
@@ -10,6 +12,8 @@ export interface FingerprintInput {
 
 const SYSTEM_PROMPT_PREFIX_LENGTH = 256;
 const FINGERPRINT_HEX_LENGTH = 16;
+// NUL cannot appear in provider/model/tool identifiers, so adjacent fields
+// cannot collide across the boundary ("a b"+"c" vs "a"+"b c").
 const FIELD_SEPARATOR = "\u0000";
 
 /**

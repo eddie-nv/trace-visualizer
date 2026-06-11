@@ -4,6 +4,11 @@
  *
  * Deliberately excludes `gen_ai.usage.total_tokens` (non-standard, DESIGN
  * §2.1) — consumers sum input + output tokens instead.
+ *
+ * Not every constant is emitted yet: `RESPONSE_ID` lands with the fetch hook
+ * (M2) and the `agentgraph.*` namespace is stamped by the SDK's onStart
+ * processor (M3, DESIGN §2.2). They are declared here so the schema has a
+ * single source of truth.
  */
 export const ATTR = {
   PROVIDER_NAME: "gen_ai.provider.name",

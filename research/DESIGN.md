@@ -38,7 +38,11 @@ export function withLLMCall<T>(
   fn: (span: LLMSpan) => T | Promise<T>,
 ): Promise<T>;
 export interface LLMSpan {
-  reportRequest(req: { model: string; messages: unknown[]; system?: unknown }): void;
+  // M1 refinement (type-design-analyzer): staged interface — reportRequest returns the
+  // handle carrying reportResponse, making response-before-request unrepresentable.
+  reportRequest(req: { model: string; messages: unknown[]; system?: unknown }): LLMSpanAfterRequest;
+}
+export interface LLMSpanAfterRequest {
   reportResponse(res: { model?: string; usage?: Usage; messages?: unknown[]; finishReasons?: string[] }): void;
 }
 

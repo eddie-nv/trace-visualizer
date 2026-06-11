@@ -224,6 +224,9 @@ describe("withLLMCall", () => {
     ).rejects.toThrow(TypeError);
     const span = getSingleFinishedSpan();
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
+    // The caller DID call reportRequest — a validation failure must not also
+    // stamp the misleading never-called warning.
+    expect(span.attributes["agentgraph.warn"]).toBeUndefined();
   });
 
   it("emits no usage attributes when reportResponse omits usage", async () => {
