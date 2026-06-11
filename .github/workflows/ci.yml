@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      jaeger:
+        image: jaegertracing/all-in-one:1.62.0
+        env:
+          COLLECTOR_OTLP_ENABLED: "true"
+        ports:
+          - 4318:4318
+          - 16686:16686
+        options: >-
+          --health-cmd "wget -qO- http://localhost:14269/ || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+      - name: Runtime smoke (Node)
+        run: node scripts/runtime-smoke.ts
+      - name: Runtime smoke (Bun)
+        run: bun scripts/runtime-smoke.ts
+      - name: Jaeger export smoke (Node)
+        run: node scripts/jaeger-smoke.ts
+      - name: Jaeger export smoke (Bun)
+        run: bun scripts/jaeger-smoke.ts
