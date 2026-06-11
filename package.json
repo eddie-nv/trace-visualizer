@@ -1,0 +1,36 @@
+{
+  "name": "agentgraph",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "jaeger:up": "docker compose up -d jaeger",
+    "jaeger:down": "docker compose down",
+    "smoke:runtime": "node scripts/runtime-smoke.ts",
+    "smoke:jaeger": "node scripts/jaeger-smoke.ts"
+  },
+  "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-trace-base": "^2.8.0",
+    "@vitest/coverage-v8": "^4.1.8",
+    "prettier": "^3.8.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.8"
+  }
+}

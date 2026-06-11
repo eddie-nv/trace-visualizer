@@ -1,0 +1,40 @@
+{
+  "name": "@agentgraph/register",
+  "version": "0.0.0",
+  "description": "AgentGraph preload entry: side-effect init for --import, --require, and bun --preload",
+  "type": "module",
+  "sideEffects": true,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./cjs": {
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean --no-splitting"
+  },
+  "dependencies": {
+    "@agentgraph/sdk": "*"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}
