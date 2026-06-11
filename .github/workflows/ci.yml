@@ -16,6 +16,11 @@ jobs:
         ports:
           - 4318:4318
           - 16686:16686
+        options: >-
+          --health-cmd "wget -qO- http://localhost:14269/ || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
