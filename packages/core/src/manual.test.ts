@@ -118,7 +118,7 @@ describe("withLLMCall", () => {
   it("does not expose reportResponse before reportRequest is called", async () => {
     // The staged interface makes report-response-first unrepresentable.
     await withLLMCall(CHAT_ATTRS, (span) => {
-      expect((span as Record<string, unknown>)["reportResponse"]).toBeUndefined();
+      expect((span as unknown as Record<string, unknown>)["reportResponse"]).toBeUndefined();
       span.reportRequest(REQUEST);
       return undefined;
     });
