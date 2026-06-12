@@ -14,9 +14,22 @@ export interface JaegerTag {
   readonly value: unknown;
 }
 
+export interface JaegerSpanReference {
+  readonly refType: string;
+  readonly traceID: string;
+  readonly spanID: string;
+}
+
 export interface JaegerSpan {
+  readonly traceID: string;
+  readonly spanID: string;
   readonly operationName: string;
   readonly tags: readonly JaegerTag[];
+  /** Microseconds since epoch. */
+  readonly startTime: number;
+  /** Microseconds. */
+  readonly duration: number;
+  readonly references?: readonly JaegerSpanReference[];
 }
 
 interface JaegerTracesResponse {
@@ -25,6 +38,25 @@ interface JaegerTracesResponse {
 
 export function tagValue(span: JaegerSpan, key: string): unknown {
   return span.tags.find((tag) => tag.key === key)?.value;
+}
+
+/** All tags as a plain attributes record (the query-contract input shape). */
+export function tagRecord(span: JaegerSpan): Record<string, unknown> {
+  return Object.fromEntries(span.tags.map((tag) => [tag.key, tag.value]));
+}
+
+/** The CHILD_OF parent span id, if any. */
+export function parentSpanId(span: JaegerSpan): string | undefined {
+  return span.references?.find((ref) => ref.refType === "CHILD_OF")?.spanID;
+}
+
+/** Raw trace JSON (`/api/traces/{id}`) — committed as the Test A fixture. */
+export async function fetchTraceJson(traceId: string): Promise<unknown> {
+  const response = await fetch(`${JAEGER_QUERY_URL}/api/traces/${encodeURIComponent(traceId)}`);
+  if (!response.ok) {
+    throw new Error(`jaeger: could not fetch trace ${traceId} (HTTP ${response.status})`);
+  }
+  return response.json();
 }
 
 export async function isJaegerReachable(): Promise<boolean> {

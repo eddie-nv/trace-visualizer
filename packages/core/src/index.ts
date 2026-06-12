@@ -21,6 +21,13 @@ export {
   OpenAIInstrumentation,
   type SdkInstrumentationConfig,
 } from "./instrumentations.js";
+export {
+  isLLMCall,
+  provider,
+  usage,
+  type LLMUsage,
+  type SpanAttributes,
+} from "./query-contract.js";
 export { SUPPRESS_FETCH_SPAN_KEY } from "./suppression.js";
 export {
   withLLMCall,

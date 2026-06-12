@@ -47,3 +47,5 @@ jobs:
         run: bun scripts/jaeger-smoke.ts
       - name: Test B verification (Node + Bun legs, DESIGN §6)
         run: node scripts/test-b/run.ts
+      - name: Tests A + C verification (AI SDK native + query contract, DESIGN §6)
+        run: node scripts/test-c/run.ts

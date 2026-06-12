@@ -1,0 +1,12 @@
+{
+  "name": "ai-sdk-native-test-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Test A-lite app (M7, DESIGN §6 Test A adapted): one tool-using chat turn through AI SDK v6 native telemetry, direct Anthropic provider (no AI Gateway). Zero OTel/agentgraph imports — telemetry goes to whatever global tracer the environment registered.",
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.84",
+    "ai": "^6.0.203",
+    "zod": "^4.1.8"
+  }
+}
