@@ -1,0 +1,692 @@
+{
+  "_provenance": {
+    "generatedAt": "2026-06-12T19:52:02.437Z",
+    "source": "scripts/test-c/run.ts (M7 Test A-lite)",
+    "note": "Native AI SDK v6 telemetry from a direct streamText weather turn against the deterministic Anthropic mock. The documented Test A recipe (vercel/ai-chatbot + @vercel/otel + AI Gateway) is pending gateway credentials — re-export this fixture from the real app when they are available (DESIGN §6 Test A).",
+    "aiSdkVersion": "6.0.203",
+    "runtime": "node v24.4.1"
+  },
+  "trace": {
+    "data": [
+      {
+        "traceID": "ab96feaba9b3de5f6470a0cc5fab4524",
+        "spans": [
+          {
+            "traceID": "ab96feaba9b3de5f6470a0cc5fab4524",
+            "spanID": "47f73b09607c897a",
+            "operationName": "ai.toolCall",
+            "references": [
+              {
+                "refType": "CHILD_OF",
+                "traceID": "ab96feaba9b3de5f6470a0cc5fab4524",
+                "spanID": "d3872b982df1715f"
+              }
+            ],
+            "startTime": 1781293918467000,
+            "duration": 714,
+            "tags": [
+              {
+                "key": "ai.operationId",
+                "type": "string",
+                "value": "ai.toolCall"
+              },
+              {
+                "key": "ai.telemetry.functionId",
+                "type": "string",
+                "value": "test-a-weather"
+              },
+              {
+                "key": "ai.toolCall.args",
+                "type": "string",
+                "value": "{\"city\":\"San Francisco\"}"
+              },
+              {
+                "key": "ai.toolCall.id",
+                "type": "string",
+                "value": "toolu_mock_001"
+              },
+              {
+                "key": "ai.toolCall.name",
+                "type": "string",
+                "value": "getWeather"
+              },
+              {
+                "key": "ai.toolCall.result",
+                "type": "string",
+                "value": "{\"city\":\"San Francisco\",\"temperature\":17,\"unit\":\"celsius\"}"
+              },
+              {
+                "key": "internal.span.format",
+                "type": "string",
+                "value": "otlp"
+              },
+              {
+                "key": "operation.name",
+                "type": "string",
+                "value": "ai.toolCall test-a-weather"
+              },
+              {
+                "key": "otel.scope.name",
+                "type": "string",
+                "value": "ai"
+              },
+              {
+                "key": "resource.name",
+                "type": "string",
+                "value": "test-a-weather"
+              },
+              {
+                "key": "span.kind",
+                "type": "string",
+                "value": "internal"
+              }
+            ],
+            "logs": [],
+            "processID": "p1",
+            "warnings": null
+          },
+          {
+            "traceID": "ab96feaba9b3de5f6470a0cc5fab4524",
+            "spanID": "0ab2c862a745a1e4",
+            "operationName": "ai.streamText.doStream",
+            "references": [
+              {
+                "refType": "CHILD_OF",
+                "traceID": "ab96feaba9b3de5f6470a0cc5fab4524",
+                "spanID": "d3872b982df1715f"
+              }
+            ],
+            "startTime": 1781293918365000,
+            "duration": 137442,
+            "tags": [
+              {
+                "key": "ai.model.id",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "ai.model.provider",
+                "type": "string",
+                "value": "anthropic.messages"
+              },
+              {
+                "key": "ai.operationId",
+                "type": "string",
+                "value": "ai.streamText.doStream"
+              },
+              {
+                "key": "ai.prompt.messages",
+                "type": "string",
+                "value": "[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What's the weather in San Francisco?\"}]}]"
+              },
+              {
+                "key": "ai.prompt.toolChoice",
+                "type": "string",
+                "value": "{\"type\":\"auto\"}"
+              },
+              {
+                "key": "ai.prompt.tools",
+                "type": "string",
+                "value": "[\"{\\\"type\\\":\\\"function\\\",\\\"name\\\":\\\"getWeather\\\",\\\"description\\\":\\\"Get the current weather at a location\\\",\\\"inputSchema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"city\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"city\\\"]}}\"]"
+              },
+              {
+                "key": "ai.response.avgOutputTokensPerSecond",
+                "type": "float64",
+                "value": 316.3681872172924
+              },
+              {
+                "key": "ai.response.finishReason",
+                "type": "string",
+                "value": "tool-calls"
+              },
+              {
+                "key": "ai.response.id",
+                "type": "string",
+                "value": "msg_mock_tool_001"
+              },
+              {
+                "key": "ai.response.model",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "ai.response.msToFinish",
+                "type": "float64",
+                "value": 132.75671100000005
+              },
+              {
+                "key": "ai.response.msToFirstChunk",
+                "type": "float64",
+                "value": 96.46426100000002
+              },
+              {
+                "key": "ai.response.providerMetadata",
+                "type": "string",
+                "value": "{\"anthropic\":{\"usage\":{\"input_tokens\":17,\"output_tokens\":42},\"cacheCreationInputTokens\":null,\"stopSequence\":null,\"iterations\":null,\"container\":null,\"contextManagement\":null}}"
+              },
+              {
+                "key": "ai.response.text",
+                "type": "string",
+                "value": ""
+              },
+              {
+                "key": "ai.response.timestamp",
+                "type": "string",
+                "value": "2026-06-12T19:51:58.461Z"
+              },
+              {
+                "key": "ai.response.toolCalls",
+                "type": "string",
+                "value": "[{\"type\":\"tool-call\",\"toolCallId\":\"toolu_mock_001\",\"toolName\":\"getWeather\",\"input\":{\"city\":\"San Francisco\"}}]"
+              },
+              {
+                "key": "ai.settings.maxRetries",
+                "type": "int64",
+                "value": 2
+              },
+              {
+                "key": "ai.telemetry.functionId",
+                "type": "string",
+                "value": "test-a-weather"
+              },
+              {
+                "key": "ai.usage.cachedInputTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.cacheReadTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.cacheWriteTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.noCacheTokens",
+                "type": "int64",
+                "value": 17
+              },
+              {
+                "key": "ai.usage.inputTokens",
+                "type": "int64",
+                "value": 17
+              },
+              {
+                "key": "ai.usage.outputTokens",
+                "type": "int64",
+                "value": 42
+              },
+              {
+                "key": "ai.usage.totalTokens",
+                "type": "int64",
+                "value": 59
+              },
+              {
+                "key": "gen_ai.request.model",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "gen_ai.response.finish_reasons",
+                "type": "string",
+                "value": "[\"tool-calls\"]"
+              },
+              {
+                "key": "gen_ai.response.id",
+                "type": "string",
+                "value": "msg_mock_tool_001"
+              },
+              {
+                "key": "gen_ai.response.model",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "gen_ai.system",
+                "type": "string",
+                "value": "anthropic.messages"
+              },
+              {
+                "key": "gen_ai.usage.input_tokens",
+                "type": "int64",
+                "value": 17
+              },
+              {
+                "key": "gen_ai.usage.output_tokens",
+                "type": "int64",
+                "value": 42
+              },
+              {
+                "key": "internal.span.format",
+                "type": "string",
+                "value": "otlp"
+              },
+              {
+                "key": "operation.name",
+                "type": "string",
+                "value": "ai.streamText.doStream test-a-weather"
+              },
+              {
+                "key": "otel.scope.name",
+                "type": "string",
+                "value": "ai"
+              },
+              {
+                "key": "resource.name",
+                "type": "string",
+                "value": "test-a-weather"
+              },
+              {
+                "key": "span.kind",
+                "type": "string",
+                "value": "internal"
+              }
+            ],
+            "logs": [
+              {
+                "timestamp": 1781293918461954,
+                "fields": [
+                  {
+                    "key": "event",
+                    "type": "string",
+                    "value": "ai.stream.firstChunk"
+                  },
+                  {
+                    "key": "ai.response.msToFirstChunk",
+                    "type": "float64",
+                    "value": 96.46426100000002
+                  }
+                ]
+              },
+              {
+                "timestamp": 1781293918498015,
+                "fields": [
+                  {
+                    "key": "event",
+                    "type": "string",
+                    "value": "ai.stream.finish"
+                  }
+                ]
+              }
+            ],
+            "processID": "p1",
+            "warnings": null
+          },
+          {
+            "traceID": "ab96feaba9b3de5f6470a0cc5fab4524",
+            "spanID": "d3872b982df1715f",
+            "operationName": "ai.streamText",
+            "references": [],
+            "startTime": 1781293918357000,
+            "duration": 213307,
+            "tags": [
+              {
+                "key": "ai.model.id",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "ai.model.provider",
+                "type": "string",
+                "value": "anthropic.messages"
+              },
+              {
+                "key": "ai.operationId",
+                "type": "string",
+                "value": "ai.streamText"
+              },
+              {
+                "key": "ai.prompt",
+                "type": "string",
+                "value": "{\"prompt\":\"What's the weather in San Francisco?\"}"
+              },
+              {
+                "key": "ai.response.finishReason",
+                "type": "string",
+                "value": "stop"
+              },
+              {
+                "key": "ai.response.providerMetadata",
+                "type": "string",
+                "value": "{\"anthropic\":{\"usage\":{\"input_tokens\":17,\"output_tokens\":42},\"cacheCreationInputTokens\":null,\"stopSequence\":null,\"iterations\":null,\"container\":null,\"contextManagement\":null}}"
+              },
+              {
+                "key": "ai.response.text",
+                "type": "string",
+                "value": "Hello from the deterministic mock."
+              },
+              {
+                "key": "ai.settings.maxRetries",
+                "type": "int64",
+                "value": 2
+              },
+              {
+                "key": "ai.telemetry.functionId",
+                "type": "string",
+                "value": "test-a-weather"
+              },
+              {
+                "key": "ai.usage.cachedInputTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.cacheReadTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.cacheWriteTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.noCacheTokens",
+                "type": "int64",
+                "value": 34
+              },
+              {
+                "key": "ai.usage.inputTokens",
+                "type": "int64",
+                "value": 34
+              },
+              {
+                "key": "ai.usage.outputTokens",
+                "type": "int64",
+                "value": 84
+              },
+              {
+                "key": "ai.usage.totalTokens",
+                "type": "int64",
+                "value": 118
+              },
+              {
+                "key": "internal.span.format",
+                "type": "string",
+                "value": "otlp"
+              },
+              {
+                "key": "operation.name",
+                "type": "string",
+                "value": "ai.streamText test-a-weather"
+              },
+              {
+                "key": "otel.scope.name",
+                "type": "string",
+                "value": "ai"
+              },
+              {
+                "key": "resource.name",
+                "type": "string",
+                "value": "test-a-weather"
+              },
+              {
+                "key": "span.kind",
+                "type": "string",
+                "value": "internal"
+              }
+            ],
+            "logs": [],
+            "processID": "p1",
+            "warnings": null
+          },
+          {
+            "traceID": "ab96feaba9b3de5f6470a0cc5fab4524",
+            "spanID": "87e05b40a0dd568e",
+            "operationName": "ai.streamText.doStream",
+            "references": [
+              {
+                "refType": "CHILD_OF",
+                "traceID": "ab96feaba9b3de5f6470a0cc5fab4524",
+                "spanID": "d3872b982df1715f"
+              }
+            ],
+            "startTime": 1781293918506000,
+            "duration": 61511,
+            "tags": [
+              {
+                "key": "ai.model.id",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "ai.model.provider",
+                "type": "string",
+                "value": "anthropic.messages"
+              },
+              {
+                "key": "ai.operationId",
+                "type": "string",
+                "value": "ai.streamText.doStream"
+              },
+              {
+                "key": "ai.prompt.messages",
+                "type": "string",
+                "value": "[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What's the weather in San Francisco?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool-call\",\"toolCallId\":\"toolu_mock_001\",\"toolName\":\"getWeather\",\"input\":{\"city\":\"San Francisco\"}}]},{\"role\":\"tool\",\"content\":[{\"type\":\"tool-result\",\"toolCallId\":\"toolu_mock_001\",\"toolName\":\"getWeather\",\"output\":{\"type\":\"json\",\"value\":{\"city\":\"San Francisco\",\"temperature\":17,\"unit\":\"celsius\"}}}]}]"
+              },
+              {
+                "key": "ai.prompt.toolChoice",
+                "type": "string",
+                "value": "{\"type\":\"auto\"}"
+              },
+              {
+                "key": "ai.prompt.tools",
+                "type": "string",
+                "value": "[\"{\\\"type\\\":\\\"function\\\",\\\"name\\\":\\\"getWeather\\\",\\\"description\\\":\\\"Get the current weather at a location\\\",\\\"inputSchema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"city\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"city\\\"]}}\"]"
+              },
+              {
+                "key": "ai.response.avgOutputTokensPerSecond",
+                "type": "float64",
+                "value": 695.3467971788453
+              },
+              {
+                "key": "ai.response.finishReason",
+                "type": "string",
+                "value": "stop"
+              },
+              {
+                "key": "ai.response.id",
+                "type": "string",
+                "value": "msg_mock_final_001"
+              },
+              {
+                "key": "ai.response.model",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "ai.response.msToFinish",
+                "type": "float64",
+                "value": 60.40151500000002
+              },
+              {
+                "key": "ai.response.msToFirstChunk",
+                "type": "float64",
+                "value": 20.22428500000001
+              },
+              {
+                "key": "ai.response.providerMetadata",
+                "type": "string",
+                "value": "{\"anthropic\":{\"usage\":{\"input_tokens\":17,\"output_tokens\":42},\"cacheCreationInputTokens\":null,\"stopSequence\":null,\"iterations\":null,\"container\":null,\"contextManagement\":null}}"
+              },
+              {
+                "key": "ai.response.text",
+                "type": "string",
+                "value": "Hello from the deterministic mock."
+              },
+              {
+                "key": "ai.response.timestamp",
+                "type": "string",
+                "value": "2026-06-12T19:51:58.526Z"
+              },
+              {
+                "key": "ai.settings.maxRetries",
+                "type": "int64",
+                "value": 2
+              },
+              {
+                "key": "ai.telemetry.functionId",
+                "type": "string",
+                "value": "test-a-weather"
+              },
+              {
+                "key": "ai.usage.cachedInputTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.cacheReadTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.cacheWriteTokens",
+                "type": "int64",
+                "value": 0
+              },
+              {
+                "key": "ai.usage.inputTokenDetails.noCacheTokens",
+                "type": "int64",
+                "value": 17
+              },
+              {
+                "key": "ai.usage.inputTokens",
+                "type": "int64",
+                "value": 17
+              },
+              {
+                "key": "ai.usage.outputTokens",
+                "type": "int64",
+                "value": 42
+              },
+              {
+                "key": "ai.usage.totalTokens",
+                "type": "int64",
+                "value": 59
+              },
+              {
+                "key": "gen_ai.request.model",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "gen_ai.response.finish_reasons",
+                "type": "string",
+                "value": "[\"stop\"]"
+              },
+              {
+                "key": "gen_ai.response.id",
+                "type": "string",
+                "value": "msg_mock_final_001"
+              },
+              {
+                "key": "gen_ai.response.model",
+                "type": "string",
+                "value": "claude-mock-model"
+              },
+              {
+                "key": "gen_ai.system",
+                "type": "string",
+                "value": "anthropic.messages"
+              },
+              {
+                "key": "gen_ai.usage.input_tokens",
+                "type": "int64",
+                "value": 17
+              },
+              {
+                "key": "gen_ai.usage.output_tokens",
+                "type": "int64",
+                "value": 42
+              },
+              {
+                "key": "internal.span.format",
+                "type": "string",
+                "value": "otlp"
+              },
+              {
+                "key": "operation.name",
+                "type": "string",
+                "value": "ai.streamText.doStream test-a-weather"
+              },
+              {
+                "key": "otel.scope.name",
+                "type": "string",
+                "value": "ai"
+              },
+              {
+                "key": "resource.name",
+                "type": "string",
+                "value": "test-a-weather"
+              },
+              {
+                "key": "span.kind",
+                "type": "string",
+                "value": "internal"
+              }
+            ],
+            "logs": [
+              {
+                "timestamp": 1781293918526521,
+                "fields": [
+                  {
+                    "key": "event",
+                    "type": "string",
+                    "value": "ai.stream.firstChunk"
+                  },
+                  {
+                    "key": "ai.response.msToFirstChunk",
+                    "type": "float64",
+                    "value": 20.22428500000001
+                  }
+                ]
+              },
+              {
+                "timestamp": 1781293918566666,
+                "fields": [
+                  {
+                    "key": "event",
+                    "type": "string",
+                    "value": "ai.stream.finish"
+                  }
+                ]
+              }
+            ],
+            "processID": "p1",
+            "warnings": null
+          }
+        ],
+        "processes": {
+          "p1": {
+            "serviceName": "ta-mqbcenil-1y5l",
+            "tags": [
+              {
+                "key": "telemetry.sdk.language",
+                "type": "string",
+                "value": "nodejs"
+              },
+              {
+                "key": "telemetry.sdk.name",
+                "type": "string",
+                "value": "opentelemetry"
+              },
+              {
+                "key": "telemetry.sdk.version",
+                "type": "string",
+                "value": "2.8.0"
+              }
+            ]
+          }
+        },
+        "warnings": null
+      }
+    ],
+    "total": 0,
+    "limit": 0,
+    "offset": 0,
+    "errors": null
+  }
+}
