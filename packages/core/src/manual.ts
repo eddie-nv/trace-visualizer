@@ -1,6 +1,12 @@
-import { context, SpanKind, SpanStatusCode, trace, type Span } from "@opentelemetry/api";
+import { context, SpanKind, trace, type Span } from "@opentelemetry/api";
 import { ATTR } from "./attributes.js";
 import { shouldSendContent } from "./content-gating.js";
+import {
+  applyUsage,
+  formatSystemInstructions,
+  recordSpanError,
+  setStringAttribute,
+} from "./span-attrs.js";
 import { TRACER_NAME } from "./tracer.js";
 
 export type LLMOperation = "chat" | "text_completion";
@@ -55,7 +61,7 @@ export interface LLMSpan {
   reportRequest(req: LLMSpanRequest): LLMSpanAfterRequest;
 }
 
-const WARN_ATTRIBUTE = "agentgraph.warn";
+const WARN_ATTRIBUTE = ATTR.WARN;
 
 /**
  * Manual instrumentation escape hatch (DESIGN §1). Emits a CLIENT span via
@@ -100,7 +106,7 @@ export function withLLMCall<T>(
       try {
         return await fn(llmSpan);
       } catch (error) {
-        recordError(span, error);
+        recordSpanError(span, error);
         throw error;
       } finally {
         if (!isRequestReported) {
@@ -145,9 +151,7 @@ function applyRequest(span: Span, operation: LLMOperation, req: LLMSpanRequest):
 }
 
 function applyResponse(span: Span, res: LLMSpanResponse): void {
-  if (res.model !== undefined) {
-    span.setAttribute(ATTR.RESPONSE_MODEL, res.model);
-  }
+  setStringAttribute(span, ATTR.RESPONSE_MODEL, res.model);
   if (res.finishReasons !== undefined) {
     span.setAttribute(ATTR.RESPONSE_FINISH_REASONS, [...res.finishReasons]);
   }
@@ -156,30 +160,4 @@ function applyResponse(span: Span, res: LLMSpanResponse): void {
   if (res.messages !== undefined && shouldSendContent(undefined, context.active())) {
     span.setAttribute(ATTR.OUTPUT_MESSAGES, JSON.stringify(res.messages));
   }
-}
-
-function applyUsage(span: Span, usage?: Readonly<Usage>): void {
-  if (usage === undefined) {
-    return;
-  }
-  setNumberAttribute(span, ATTR.USAGE_INPUT_TOKENS, usage.inputTokens);
-  setNumberAttribute(span, ATTR.USAGE_OUTPUT_TOKENS, usage.outputTokens);
-  setNumberAttribute(span, ATTR.USAGE_CACHE_CREATION_INPUT_TOKENS, usage.cacheCreationInputTokens);
-  setNumberAttribute(span, ATTR.USAGE_CACHE_READ_INPUT_TOKENS, usage.cacheReadInputTokens);
-}
-
-function setNumberAttribute(span: Span, key: string, value: number | undefined): void {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    span.setAttribute(key, value);
-  }
-}
-
-function formatSystemInstructions(system: unknown): unknown {
-  return typeof system === "string" ? [{ type: "text", content: system }] : system;
-}
-
-function recordError(span: Span, error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
-  span.recordException(error instanceof Error ? error : message);
-  span.setStatus({ code: SpanStatusCode.ERROR, message });
 }
