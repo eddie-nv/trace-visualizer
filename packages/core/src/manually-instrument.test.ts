@@ -158,8 +158,7 @@ function messagesCreate(module: Record<string, unknown>): CreateFn {
 }
 
 function completionsCreate(module: Record<string, unknown>): CreateFn {
-  const chat = (module["OpenAI"] as { Chat: { Completions: new () => { create: CreateFn } } })
-    .Chat;
+  const chat = (module["OpenAI"] as { Chat: { Completions: new () => { create: CreateFn } } }).Chat;
   const instance = new chat.Completions();
   return (params) => instance.create(params);
 }

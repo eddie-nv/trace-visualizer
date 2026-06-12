@@ -8,13 +8,23 @@ import {
   SimpleSpanProcessor,
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { instrumentFetch, uninstrumentFetch } from "@agentgraph/core";
+import {
+  instrumentFetch,
+  manuallyInstrument,
+  uninstrumentFetch,
+  uninstrumentModule,
+  type InstrumentedProvider,
+} from "@agentgraph/core";
 import { resolveConfig, type InitOptions, type ResolvedConfig } from "./config.js";
+import { activateTier3 } from "./module-hooks.js";
 import { StampingSpanProcessor } from "./stamping-processor.js";
+
+type InstrumentedModuleEntry = readonly [InstrumentedProvider, unknown];
 
 interface SdkState {
   provider: BasicTracerProvider;
   isFetchInstrumented: boolean;
+  instrumentedModules: readonly InstrumentedModuleEntry[];
 }
 
 let state: SdkState | undefined;
@@ -40,6 +50,7 @@ export function init(options?: InitOptions): void {
     return;
   }
   const config = resolveConfig(options);
+  let instrumentedModules: readonly InstrumentedModuleEntry[] = [];
   try {
     if (config.instrumentFetch) {
       instrumentFetch({
@@ -49,18 +60,49 @@ export function init(options?: InitOptions): void {
         }),
       });
     }
+    instrumentedModules = instrumentProvidedModules(config);
     const provider = createProvider(config);
     const contextManager = new AsyncLocalStorageContextManager();
     contextManager.enable();
     context.setGlobalContextManager(contextManager);
     trace.setGlobalTracerProvider(provider);
-    state = { provider, isFetchInstrumented: config.instrumentFetch };
+    if (config.instrumentSdks) {
+      // Tier 3 (DESIGN §3): after provider registration so hooked modules
+      // emit through it. activateTier3 never throws — loader-hook failures
+      // degrade to tier 1 with a warning.
+      activateTier3({ traceContent: config.traceContent });
+    }
+    state = { provider, isFetchInstrumented: config.instrumentFetch, instrumentedModules };
   } catch (error) {
-    // don't leave the fetch hook installed with no state to uninstall it from
+    // don't leave hooks installed with no state to uninstall them from
     if (config.instrumentFetch) {
       uninstrumentFetch();
     }
+    uninstrumentProvidedModules(instrumentedModules);
     throw error;
+  }
+}
+
+/** Tier-2 activation (DESIGN §3 tier 2): patch each provided SDK module.
+ * `manuallyInstrument` degrades to a warn on bad shapes, so every entry is
+ * recorded for symmetric un-instrumentation at shutdown. */
+function instrumentProvidedModules(config: ResolvedConfig): readonly InstrumentedModuleEntry[] {
+  if (config.instrumentModules === undefined) {
+    return [];
+  }
+  const providers: readonly InstrumentedProvider[] = ["anthropic", "openai"];
+  return providers
+    .filter((provider) => config.instrumentModules?.[provider] !== undefined)
+    .map((provider) => {
+      const module = config.instrumentModules?.[provider];
+      manuallyInstrument(provider, module, { traceContent: config.traceContent });
+      return [provider, module] as const;
+    });
+}
+
+function uninstrumentProvidedModules(entries: readonly InstrumentedModuleEntry[]): void {
+  for (const [provider, module] of entries) {
+    uninstrumentModule(provider, module);
   }
 }
 
@@ -88,6 +130,7 @@ export async function shutdown(): Promise<void> {
   if (active.isFetchInstrumented) {
     uninstrumentFetch();
   }
+  uninstrumentProvidedModules(active.instrumentedModules);
   try {
     await active.provider.shutdown();
   } finally {

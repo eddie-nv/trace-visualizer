@@ -11,6 +11,16 @@ export { ALLOW_TRACE_CONTENT_KEY, shouldSendContent, type CoreConfig } from "./c
 export { computeAgentFingerprint, type FingerprintInput } from "./fingerprint.js";
 export { instrumentFetch, uninstrumentFetch, type FetchHookConfig } from "./fetch-hook.js";
 export type { MatchOriginOverrides } from "./providers.js";
+export {
+  manuallyInstrument,
+  uninstrumentModule,
+  type InstrumentedProvider,
+} from "./manually-instrument.js";
+export {
+  AnthropicInstrumentation,
+  OpenAIInstrumentation,
+  type SdkInstrumentationConfig,
+} from "./instrumentations.js";
 export { SUPPRESS_FETCH_SPAN_KEY } from "./suppression.js";
 export {
   withLLMCall,

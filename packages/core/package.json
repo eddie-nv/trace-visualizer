@@ -30,5 +30,8 @@
   },
   "engines": {
     "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@opentelemetry/instrumentation": "^0.219.0"
   }
 }
