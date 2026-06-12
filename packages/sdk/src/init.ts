@@ -40,10 +40,10 @@ export function init(options?: InitOptions): void {
     return;
   }
   const config = resolveConfig(options);
-  if (config.instrumentFetch) {
-    instrumentFetch({ traceContent: config.traceContent });
-  }
   try {
+    if (config.instrumentFetch) {
+      instrumentFetch({ traceContent: config.traceContent });
+    }
     const provider = createProvider(config);
     const contextManager = new AsyncLocalStorageContextManager();
     contextManager.enable();
