@@ -31,6 +31,8 @@ export function assertTestATree(spans: readonly JaegerSpan[]): TestATree {
     (a, b) => a.startTime - b.startTime,
   );
   assert.equal(doStreams.length, 2, `expected 2 doStream steps, got ${doStreams.length}`);
+  // Safe: the assert above guarantees both elements; node:assert carries no
+  // type-narrowing signature TS could use here.
   const [stepOne, stepTwo] = doStreams as [JaegerSpan, JaegerSpan];
 
   const toolCalls = byOperation("ai.toolCall");

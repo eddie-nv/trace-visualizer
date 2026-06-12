@@ -31,9 +31,9 @@ export interface LLMUsage {
  */
 export function isLLMCall(attributes: SpanAttributes): boolean {
   return (
-    attributes[ATTR.REQUEST_MODEL] !== undefined &&
-    (attributes[ATTR.USAGE_INPUT_TOKENS] !== undefined ||
-      attributes[ATTR.USAGE_OUTPUT_TOKENS] !== undefined)
+    asNonEmptyString(attributes[ATTR.REQUEST_MODEL]) !== undefined &&
+    (asTokenCount(attributes[ATTR.USAGE_INPUT_TOKENS]) !== undefined ||
+      asTokenCount(attributes[ATTR.USAGE_OUTPUT_TOKENS]) !== undefined)
   );
 }
 
@@ -60,13 +60,16 @@ function asNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+/** Token counts are non-negative decimal integers — anything else (hex
+ * strings, exponent notation, negatives) is a corrupt tag, not a count. */
+const DECIMAL_INTEGER = /^\d+$/;
+
 function asTokenCount(value: unknown): number | undefined {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : undefined;
   }
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
+  if (typeof value === "string" && DECIMAL_INTEGER.test(value.trim())) {
+    return Number(value.trim());
   }
   return undefined;
 }

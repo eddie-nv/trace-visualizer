@@ -66,9 +66,12 @@ function runTurnSubprocess(mockOrigin: string, serviceName: string): Promise<voi
       ANTHROPIC_API_KEY: "mock-key",
       BARE_MODEL: MODEL,
     },
-    stdio: ["ignore", "ignore", "pipe"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
   let stderr = "";
+  child.stdout?.on("data", (chunk: Buffer) => {
+    process.stdout.write(chunk); // forward the turn's confirmation line to CI logs
+  });
   child.stderr?.on("data", (chunk: Buffer) => {
     stderr += chunk.toString("utf8");
   });
@@ -77,7 +80,8 @@ function runTurnSubprocess(mockOrigin: string, serviceName: string): Promise<voi
       child.kill("SIGKILL");
       reject(new Error(`test-a turn timed out after ${TURN_TIMEOUT_MS}ms\n${stderr}`));
     }, TURN_TIMEOUT_MS);
-    child.once("exit", (code, signal) => {
+    // "close" (not "exit"): stdio is fully drained, so stderr is complete.
+    child.once("close", (code, signal) => {
       clearTimeout(timer);
       if (code === 0) {
         resolve();
@@ -149,11 +153,13 @@ function writeFixture(traceJson: unknown): void {
 
 function readAiSdkVersion(): string {
   try {
-    const pkg = JSON.parse(
-      readFileSync(`${REPO_ROOT}node_modules/ai/package.json`, "utf8"),
-    ) as Record<string, unknown>;
+    const pkgPath = fileURLToPath(new URL("../../node_modules/ai/package.json", import.meta.url));
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as Record<string, unknown>;
     return typeof pkg["version"] === "string" ? pkg["version"] : "unknown";
-  } catch {
+  } catch (error) {
+    console.warn(
+      `test-c: could not read the ai package version for the fixture provenance (${error instanceof Error ? error.message : String(error)})`,
+    );
     return "unknown";
   }
 }
@@ -201,6 +207,10 @@ async function main(): Promise<void> {
         tree.doStreams.map((span) => span.spanID),
       ),
     );
+    // Expected = ALL bare-leg spans: the shim emits only LLM-call spans, so
+    // this direction of the check asserts isLLMCall accepts every one of
+    // them (false positives are impossible here — selection ⊆ the set; the
+    // negative cases live in the A set's root/toolCall spans).
     evidence.push(
       assertContractSelection(
         "B (agentgraph shim)",

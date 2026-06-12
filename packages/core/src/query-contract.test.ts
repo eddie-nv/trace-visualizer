@@ -64,6 +64,14 @@ describe("isLLMCall (DESIGN §2.3)", () => {
     expect(isLLMCall({ "gen_ai.usage.input_tokens": 5 })).toBe(false);
   });
 
+  it("rejects corrupt model and usage tag values", () => {
+    expect(isLLMCall({ "gen_ai.request.model": 42, "gen_ai.usage.input_tokens": 5 })).toBe(false);
+    expect(isLLMCall({ "gen_ai.request.model": "", "gen_ai.usage.input_tokens": 5 })).toBe(false);
+    expect(isLLMCall({ "gen_ai.request.model": "m", "gen_ai.usage.input_tokens": "junk" })).toBe(
+      false,
+    );
+  });
+
   it("requires at least one usage token count", () => {
     expect(isLLMCall({ "gen_ai.request.model": "m" })).toBe(false);
     expect(isLLMCall({ "gen_ai.request.model": "m", "gen_ai.usage.input_tokens": 0 })).toBe(true);
@@ -111,5 +119,11 @@ describe("usage (DESIGN §2.3 — identical key in all three sources)", () => {
     expect(usage({ "gen_ai.usage.input_tokens": 17 })).toEqual({ inputTokens: 17 });
     expect(usage({ "gen_ai.usage.output_tokens": "not a number" })).toEqual({});
     expect(usage({})).toEqual({});
+  });
+
+  it("rejects non-decimal string encodings (hex, exponent, negative)", () => {
+    expect(usage({ "gen_ai.usage.input_tokens": "0x10" })).toEqual({});
+    expect(usage({ "gen_ai.usage.input_tokens": "1e3" })).toEqual({});
+    expect(usage({ "gen_ai.usage.input_tokens": "-5" })).toEqual({});
   });
 });
