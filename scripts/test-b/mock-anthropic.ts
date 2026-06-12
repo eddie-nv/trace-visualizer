@@ -9,7 +9,7 @@
  * final `message_delta` carries the real output_tokens — so criterion 2
  * (streaming usage == non-streaming usage) exercises real accumulation.
  */
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 export const MOCK_USAGE = { input_tokens: 17, output_tokens: 42 } as const;
 export const MOCK_JSON_MESSAGE_ID = "msg_mock_json_001";
@@ -63,9 +63,13 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error(`mock-anthropic: request failed: ${detail}`);
-    if (!res.headersSent) {
-      res.writeHead(500, { "content-type": "application/json" });
+    if (res.headersSent) {
+      // Mid-stream failure: never inject error JSON into a started SSE body —
+      // killing the socket is the only honest signal left.
+      res.destroy();
+      return;
     }
+    res.writeHead(500, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: detail }));
   }
 }
@@ -100,6 +104,9 @@ function respondJson(res: ServerResponse, model: string): void {
 async function respondStreaming(res: ServerResponse, model: string): Promise<void> {
   res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
   for (const event of streamEvents(model)) {
+    if (res.writableEnded || res.destroyed) {
+      return; // client went away mid-stream; writing now would throw
+    }
     res.write(`event: ${event["type"] as string}\ndata: ${JSON.stringify(event)}\n\n`);
     // A small pause forces multiple reads through the hook's teed branch,
     // exercising the chunk-boundary cases criterion 4 exists to catch.

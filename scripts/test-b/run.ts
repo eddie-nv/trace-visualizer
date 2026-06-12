@@ -36,6 +36,7 @@ const REGISTER_DIST = fileURLToPath(
 const BASE_PORT = 18791;
 const ONE_LINE_AGENT_ID = "test-agent";
 const CONTEXT_PROBE = "scripts/test-b/q1-context-probe.ts";
+const PROBE_TIMEOUT_MS = 30_000;
 
 /** Q1's second half: context.with across async boundaries, per runtime. */
 function runContextProbe(runtime: "node" | "bun"): Evidence {
@@ -49,9 +50,13 @@ function runContextProbe(runtime: "node" | "bun"): Evidence {
     cwd: REPO_ROOT,
     encoding: "utf8",
     env: cleanEnv,
+    timeout: PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0) {
-    throw new Error(`q1 context probe failed under ${runtime}:\n${result.stderr}`);
+    const spawnFailure = result.error === undefined ? "" : ` (${result.error.message})`;
+    throw new Error(
+      `q1 context probe failed under ${runtime} (status ${result.status})${spawnFailure}:\n${result.stderr}`,
+    );
   }
   return { criterion: `Q1 context propagation (${runtime})`, detail: result.stdout.trim() };
 }
@@ -78,7 +83,9 @@ function printReport(evidence: readonly Evidence[]): void {
 async function main(): Promise<void> {
   await preflight();
   const mock = await startMockAnthropic();
-  const runId = Date.now().toString(36);
+  // pid suffix: two runs in the same millisecond must not share Jaeger
+  // service names, or waitForSpans could match the other run's spans.
+  const runId = `${Date.now().toString(36)}-${process.pid.toString(36)}`;
   try {
     const leg = (
       label: string,
@@ -126,14 +133,14 @@ async function main(): Promise<void> {
     evidence.push(assertUsageParity(nodePreload));
     evidence.push(assertContentRemoved(nodeContentOff));
     evidence.push(assertByteIdentity(nodeBaseline, nodePreload));
-    // Criterion 5: the same attribute + parity + byte gates, on Bun. Green
-    // means the fetch hook, ALS context manager, and OTLP proto exporter all
-    // work under Bun (Q1) and the SDK's requests hit globalThis.fetch (Q2).
-    assertSpanAttributes(bunPreload);
-    assertUsageParity(bunPreload);
+    // Criterion 5: the same attribute + parity gates, on Bun. Green means the
+    // fetch hook, ALS context manager, and OTLP proto exporter all work under
+    // Bun (Q1) and the SDK's requests hit globalThis.fetch (Q2).
+    const bunAttributes = assertSpanAttributes(bunPreload);
+    const bunParity = assertUsageParity(bunPreload);
     evidence.push({
       criterion: "5: Bun leg (answers Q1/Q2)",
-      detail: `bun-preload: spans exported and attribute-complete under Bun ${bunVersion()}`,
+      detail: `Bun ${bunVersion()} — ${bunAttributes.detail}; ${bunParity.detail}`,
     });
     evidence.push(assertByteIdentity(bunBaseline, bunPreload));
     evidence.push(assertSpanAttributes(oneLine));

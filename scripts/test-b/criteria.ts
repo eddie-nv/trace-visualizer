@@ -42,6 +42,25 @@ interface LegSpans {
   readonly stream: JaegerSpan;
 }
 
+/** Asserts the tag exists and is numeric before comparing — `Number(undefined)`
+ * is NaN and must surface as "missing tag", never as a vacuous comparison. */
+function numericTag(span: JaegerSpan, key: string, where: string): number {
+  const value = tagValue(span, key);
+  assert.notEqual(value, undefined, `${where}: missing tag ${key}`);
+  const numeric = typeof value === "number" ? value : Number(value);
+  assert.ok(Number.isFinite(numeric), `${where}: tag ${key} is not numeric (${String(value)})`);
+  return numeric;
+}
+
+function assertFinishReason(span: JaegerSpan, where: string): void {
+  const finishReasons = tagValue(span, ATTR.RESPONSE_FINISH_REASONS);
+  assert.notEqual(finishReasons, undefined, `${where}: missing ${ATTR.RESPONSE_FINISH_REASONS}`);
+  assert.ok(
+    String(finishReasons).includes(MOCK_STOP_REASON),
+    `${where}: finish_reasons "${String(finishReasons)}" missing "${MOCK_STOP_REASON}"`,
+  );
+}
+
 function spansOf(leg: LegResult): LegSpans {
   assert.equal(
     leg.spans.length,
@@ -70,19 +89,19 @@ export function assertSpanAttributes(leg: LegResult): Evidence {
     assert.equal(tagValue(span, ATTR.PROVIDER_NAME), "anthropic", `${where}: provider`);
     assert.equal(tagValue(span, ATTR.REQUEST_MODEL), MODEL, `${where}: request model`);
     assert.equal(
-      Number(tagValue(span, ATTR.USAGE_INPUT_TOKENS)),
+      numericTag(span, ATTR.USAGE_INPUT_TOKENS, where),
       MOCK_USAGE.input_tokens,
       `${where}: input tokens`,
     );
     assert.equal(
-      Number(tagValue(span, ATTR.USAGE_OUTPUT_TOKENS)),
+      numericTag(span, ATTR.USAGE_OUTPUT_TOKENS, where),
       MOCK_USAGE.output_tokens,
       `${where}: output tokens`,
     );
-    assert.ok(
-      String(tagValue(span, ATTR.RESPONSE_FINISH_REASONS) ?? "").includes(MOCK_STOP_REASON),
-      `${where}: finish_reasons missing "${MOCK_STOP_REASON}"`,
-    );
+    assertFinishReason(span, where);
+    // Only input/output messages are asserted present: the bare app sends no
+    // system prompt or tools, so the other two content attrs are legitimately
+    // absent here. Their removal is still covered by assertContentRemoved.
     for (const contentAttr of [CONTENT_ATTRIBUTES[0], CONTENT_ATTRIBUTES[3]]) {
       assert.notEqual(
         tagValue(span, contentAttr),
@@ -103,8 +122,8 @@ export function assertUsageParity(leg: LegResult): Evidence {
   const { json, stream } = spansOf(leg);
   for (const attr of [ATTR.USAGE_INPUT_TOKENS, ATTR.USAGE_OUTPUT_TOKENS]) {
     assert.equal(
-      Number(tagValue(stream, attr)),
-      Number(tagValue(json, attr)),
+      numericTag(stream, attr, `${leg.label}/streaming`),
+      numericTag(json, attr, `${leg.label}/non-streaming`),
       `${leg.label}: ${attr} differs between streaming and non-streaming`,
     );
   }
@@ -128,14 +147,11 @@ export function assertContentRemoved(leg: LegResult): Evidence {
     }
     assert.equal(tagValue(span, ATTR.REQUEST_MODEL), MODEL, `${leg.label}: model survived`);
     assert.equal(
-      Number(tagValue(span, ATTR.USAGE_OUTPUT_TOKENS)),
+      numericTag(span, ATTR.USAGE_OUTPUT_TOKENS, leg.label),
       MOCK_USAGE.output_tokens,
       `${leg.label}: usage survived`,
     );
-    assert.ok(
-      String(tagValue(span, ATTR.RESPONSE_FINISH_REASONS) ?? "").includes(MOCK_STOP_REASON),
-      `${leg.label}: finish_reasons survived`,
-    );
+    assertFinishReason(span, leg.label);
   }
   return {
     criterion: "3: content toggle",

@@ -31,14 +31,26 @@ export async function isJaegerReachable(): Promise<boolean> {
   return response?.ok === true;
 }
 
-async function fetchServiceSpans(service: string): Promise<JaegerSpan[]> {
+interface SpanFetchResult {
+  readonly spans: JaegerSpan[];
+  /** Set when the query itself failed — "0 spans" and "Jaeger down" must stay distinguishable. */
+  readonly queryFailure?: string;
+}
+
+async function fetchServiceSpans(service: string): Promise<SpanFetchResult> {
   const url = `${JAEGER_QUERY_URL}/api/traces?service=${encodeURIComponent(service)}&limit=50`;
-  const response = await fetch(url).catch(() => undefined);
-  if (response?.ok !== true) {
-    return [];
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch (error) {
+    return { spans: [], queryFailure: error instanceof Error ? error.message : String(error) };
+  }
+  if (!response.ok) {
+    await response.text().catch(() => undefined);
+    return { spans: [], queryFailure: `HTTP ${response.status}` };
   }
   const body = (await response.json()) as JaegerTracesResponse;
-  return body.data.flatMap((trace) => [...trace.spans]);
+  return { spans: body.data.flatMap((trace) => [...trace.spans]) };
 }
 
 /**
@@ -48,22 +60,19 @@ async function fetchServiceSpans(service: string): Promise<JaegerSpan[]> {
  */
 export async function waitForSpans(service: string, expectedCount: number): Promise<JaegerSpan[]> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
-  let spans: JaegerSpan[] = [];
+  let last: SpanFetchResult = { spans: [] };
   while (Date.now() < deadline) {
-    spans = await fetchServiceSpans(service);
-    if (spans.length >= expectedCount) {
-      return spans;
+    last = await fetchServiceSpans(service);
+    if (last.spans.length >= expectedCount) {
+      return last.spans;
     }
     await sleep(POLL_INTERVAL_MS);
   }
+  const failureNote =
+    last.queryFailure === undefined ? "" : ` (last query failed: ${last.queryFailure})`;
   throw new Error(
-    `jaeger: expected ${expectedCount} span(s) for service "${service}" within ${POLL_TIMEOUT_MS}ms, found ${spans.length}`,
+    `jaeger: expected ${expectedCount} span(s) for service "${service}" within ${POLL_TIMEOUT_MS}ms, found ${last.spans.length}${failureNote}`,
   );
-}
-
-/** One non-polling read, for asserting that a service has NO spans. */
-export async function fetchSpansOnce(service: string): Promise<JaegerSpan[]> {
-  return fetchServiceSpans(service);
 }
 
 function sleep(ms: number): Promise<void> {

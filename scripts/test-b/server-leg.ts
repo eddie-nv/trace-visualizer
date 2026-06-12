@@ -62,6 +62,18 @@ export async function runLeg(config: LegConfig): Promise<LegResult> {
     await waitForHealthy(child, origin, () => stderr);
     const chat = await capturePost(origin, "/chat", PROMPT_BODY);
     const stream = await capturePost(origin, "/chat-stream", PROMPT_BODY);
+    // Two identically-failing legs would still be byte-identical — require
+    // success here so criterion 4 can never pass on matching error responses.
+    for (const [endpoint, captured] of [
+      ["/chat", chat],
+      ["/chat-stream", stream],
+    ] as const) {
+      if (captured.status !== 200) {
+        throw new Error(
+          `${endpoint} returned ${captured.status}: ${new TextDecoder().decode(captured.body)}`,
+        );
+      }
+    }
     const spans =
       config.serviceName === undefined ? [] : await waitForSpans(config.serviceName, SPANS_PER_LEG);
     return { label: config.label, chat, stream, spans, stderr };
@@ -120,8 +132,10 @@ async function waitForHealthy(
 ): Promise<void> {
   const deadline = Date.now() + HEALTH_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
-      throw new Error(`server exited with code ${child.exitCode} before becoming healthy`);
+    if (hasExited(child)) {
+      throw new Error(
+        `server exited (code ${child.exitCode}, signal ${child.signalCode}) before becoming healthy`,
+      );
     }
     const response = await fetch(`${origin}/healthz`).catch(() => undefined);
     if (response?.ok === true) {
@@ -133,8 +147,13 @@ async function waitForHealthy(
   throw new Error(`server not healthy within ${HEALTH_TIMEOUT_MS}ms\n${stderrSoFar()}`);
 }
 
+/** exitCode is null for signal-killed children — signalCode is set instead. */
+function hasExited(child: ChildProcess): boolean {
+  return child.exitCode !== null || child.signalCode !== null;
+}
+
 async function terminate(child: ChildProcess, exited: Promise<void>): Promise<void> {
-  if (child.exitCode !== null) {
+  if (hasExited(child)) {
     return;
   }
   child.kill("SIGTERM");

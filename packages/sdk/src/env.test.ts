@@ -148,14 +148,15 @@ describe("AGENTGRAPH_TEST_MATCH_ORIGIN", () => {
     // Arrange
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    // Act — missing "=", unparseable URL
+    // Act — missing "=", empty provider, unparseable URL
     const options = readEnvOptions({
-      AGENTGRAPH_TEST_MATCH_ORIGIN: "noequals,anthropic=not a url,openai=http://127.0.0.1:8789",
+      AGENTGRAPH_TEST_MATCH_ORIGIN:
+        "noequals,=http://127.0.0.1:1,anthropic=not a url,openai=http://127.0.0.1:8789",
     });
 
     // Assert
     expect(options.testMatchOrigins).toEqual({ openai: "http://127.0.0.1:8789" });
-    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledTimes(3);
   });
 
   it("omits the field entirely when every entry is malformed", () => {

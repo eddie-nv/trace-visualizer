@@ -155,7 +155,9 @@ function mayMatchProvider(candidate: string, overrides: MatchOriginOverrides | u
   if (overrides === undefined) {
     return false;
   }
-  return Object.values(overrides).some((origin) => candidate.startsWith(origin));
+  // The "/" boundary keeps origin "http://h:80" from hinting "http://h:8080/…".
+  // A bare-origin candidate (no path) can never match an adapter path anyway.
+  return Object.values(overrides).some((origin) => candidate.startsWith(`${origin}/`));
 }
 
 interface SpanObservation {
