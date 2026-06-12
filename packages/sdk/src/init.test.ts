@@ -4,6 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ATTR } from "@agentgraph/core";
 import { forceFlush, init, shutdown } from "./index.js";
 
+// Tier 3 touches real loader hooks — always mocked in unit tests; only the
+// env-flag gate is asserted here (the real path is covered in module-hooks.test).
+vi.mock("./module-hooks.js", () => ({ activateTier3: vi.fn(() => true) }));
+
 const realFetch = globalThis.fetch;
 
 afterEach(async () => {
@@ -206,5 +210,78 @@ describe("forceFlush / shutdown before init", () => {
     await expect(forceFlush()).resolves.toBeUndefined();
     await expect(shutdown()).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalled();
+  });
+});
+
+interface MockSdkModule {
+  Anthropic: { Messages: { prototype: { create: (...args: unknown[]) => unknown } } };
+}
+
+function mockAnthropicModule(): MockSdkModule {
+  class Messages {
+    async create(): Promise<unknown> {
+      return { id: "msg" };
+    }
+  }
+  class Anthropic {
+    static Messages = Messages;
+  }
+  return { Anthropic } as unknown as MockSdkModule;
+}
+
+describe("init({instrumentModules}) — tier 2 activation", () => {
+  it("wraps provided modules at init and restores them at shutdown", async () => {
+    // Arrange
+    const module = mockAnthropicModule();
+    const original = module.Anthropic.Messages.prototype.create;
+
+    // Act
+    init({
+      exporter: new InMemorySpanExporter(),
+      disableBatch: true,
+      instrumentFetch: false,
+      instrumentModules: { anthropic: module },
+    });
+
+    // Assert
+    expect(module.Anthropic.Messages.prototype.create).not.toBe(original);
+
+    await shutdown();
+    expect(module.Anthropic.Messages.prototype.create).toBe(original);
+  });
+
+  it("a failing module shape does not break init (warn, keep tracing)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    init({
+      exporter: new InMemorySpanExporter(),
+      disableBatch: true,
+      instrumentFetch: false,
+      instrumentModules: { anthropic: { wrong: "shape" } },
+    });
+
+    expect(warn).toHaveBeenCalled();
+    expect(trace.getTracer("test")).toBeDefined();
+  });
+});
+
+describe("tier-3 gating (AGENTGRAPH_INSTRUMENT_SDKS)", () => {
+  it("does not activate module hooks by default", async () => {
+    const { activateTier3 } = await import("./module-hooks.js");
+    vi.mocked(activateTier3).mockClear();
+
+    init({ exporter: new InMemorySpanExporter(), disableBatch: true, instrumentFetch: false });
+
+    expect(activateTier3).not.toHaveBeenCalled();
+  });
+
+  it("activates module hooks when the env flag is the literal 'true'", async () => {
+    const { activateTier3 } = await import("./module-hooks.js");
+    vi.mocked(activateTier3).mockClear();
+    vi.stubEnv("AGENTGRAPH_INSTRUMENT_SDKS", "true");
+
+    init({ exporter: new InMemorySpanExporter(), disableBatch: true, instrumentFetch: false });
+
+    expect(activateTier3).toHaveBeenCalledTimes(1);
   });
 });
