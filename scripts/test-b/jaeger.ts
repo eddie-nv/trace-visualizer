@@ -7,6 +7,7 @@ export const JAEGER_QUERY_URL = process.env["JAEGER_QUERY_URL"] ?? "http://local
 
 const POLL_INTERVAL_MS = 500;
 const POLL_TIMEOUT_MS = 20_000;
+const SETTLE_DELAY_MS = 1_000;
 
 export interface JaegerTag {
   readonly key: string;
@@ -64,7 +65,12 @@ export async function waitForSpans(service: string, expectedCount: number): Prom
   while (Date.now() < deadline) {
     last = await fetchServiceSpans(service);
     if (last.spans.length >= expectedCount) {
-      return last.spans;
+      // Settle recheck: over-emission (e.g. broken tier dedup, M6 §3.4)
+      // would race a >= poll — give late duplicates a chance to land so
+      // exact-count assertions can catch them.
+      await sleep(SETTLE_DELAY_MS);
+      const settled = await fetchServiceSpans(service);
+      return settled.spans.length > last.spans.length ? settled.spans : last.spans;
     }
     await sleep(POLL_INTERVAL_MS);
   }
