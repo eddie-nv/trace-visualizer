@@ -21,7 +21,7 @@ type FetchInit = Parameters<Fetch>[1];
 
 /** Both matched endpoints are chat completions (DESIGN §2.1). */
 const OPERATION = "chat";
-const WARN_ATTRIBUTE = "agentgraph.warn";
+const WARN_ATTRIBUTE = ATTR.WARN;
 const WARN_PREFIX = "[agentgraph]";
 
 interface HookState {

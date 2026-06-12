@@ -36,6 +36,8 @@ export const ATTR = {
   AGENT_FINGERPRINT: "agentgraph.agent.fingerprint",
   CONVERSATION_ID: "agentgraph.conversation.id",
   CHANNEL_TYPE: "agentgraph.channel.type",
+  /** Visible degrade marker — set when an emission path could not fully report. */
+  WARN: "agentgraph.warn",
 } as const;
 
 /** The attribute names dropped when content capture is off (DESIGN §4). */
