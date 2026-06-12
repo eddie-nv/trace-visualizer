@@ -11,8 +11,9 @@ export interface EnvOptions {
   disableBatch?: boolean;
   agentId?: string;
   /**
-   * Reserved: consumed by the `@agentgraph/register` preload (M4) to opt
-   * into tier-3 module hooks (wired in M6). `init()` deliberately ignores it.
+   * Tier-3 gate (DESIGN §3 tier 3, wired in M6): `init()` activates the
+   * module-load hooks only on the literal `"true"`. Env-only by design —
+   * loader hooks are an operator opt-in, never an API default.
    */
   instrumentSdks?: boolean;
   /**

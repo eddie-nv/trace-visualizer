@@ -25,7 +25,7 @@ export interface LegConfig {
   readonly label: string;
   readonly runtime: "node" | "bun";
   /** Entry file inside test-apps/bare; defaults to the zero-touch server. */
-  readonly entry?: "server.ts" | "server-one-line.ts";
+  readonly entry?: "server.ts" | "server-one-line.ts" | "server-tier2.ts";
   /** Load @agentgraph/register (NODE_OPTIONS --import / bun --preload). */
   readonly preload?: boolean;
   readonly port: number;

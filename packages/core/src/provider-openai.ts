@@ -4,6 +4,7 @@ import {
   asNonEmptyString,
   isRecord,
   tolerantJsonParse,
+  type ParsedEventAccumulator,
   type ParsedRequest,
   type ParsedResponse,
   type ProviderAdapter,
@@ -68,7 +69,7 @@ export const openaiAdapter: ProviderAdapter = {
     };
   },
 
-  createStreamAccumulator(): StreamAccumulator {
+  createStreamAccumulator(): StreamAccumulator & ParsedEventAccumulator {
     return new OpenAIStreamAccumulator();
   },
 };
@@ -123,7 +124,7 @@ interface ChoiceState {
  * that, the span is emitted without usage (DESIGN Q3, deferred). Streamed
  * tool-call deltas are not reconstructed in v0.
  */
-class OpenAIStreamAccumulator implements StreamAccumulator {
+class OpenAIStreamAccumulator implements StreamAccumulator, ParsedEventAccumulator {
   private id: string | undefined;
   private model: string | undefined;
   private usage: Usage | undefined;
@@ -133,7 +134,10 @@ class OpenAIStreamAccumulator implements StreamAccumulator {
     if (event.data === SSE_DONE_SENTINEL) {
       return;
     }
-    const payload = tolerantJsonParse(event.data);
+    this.onParsedEvent(tolerantJsonParse(event.data));
+  }
+
+  onParsedEvent(payload: unknown): void {
     if (!isRecord(payload)) {
       return;
     }

@@ -25,6 +25,20 @@ export interface InitOptions {
   traceContent?: boolean;
   /** Install the tier-1 fetch hook. Default true. */
   instrumentFetch?: boolean;
+  /**
+   * Tier-2 escape hatch (DESIGN §3 tier 2): already-imported SDK modules to
+   * prototype-patch — `{ anthropic: await import("@anthropic-ai/sdk") }`.
+   * Works without loader hooks (Next.js/webpack/Bun safe). Patched calls
+   * suppress the fetch-tier span, so each call emits exactly one span.
+   */
+  instrumentModules?: InstrumentModules;
+}
+
+/** Values are the imported module namespaces; `unknown` keeps the provider
+ * SDKs out of this package's dependency graph. */
+export interface InstrumentModules {
+  anthropic?: unknown;
+  openai?: unknown;
 }
 
 /** Fully resolved init configuration: options → env → defaults. */
@@ -38,6 +52,10 @@ export interface ResolvedConfig {
   disableBatch: boolean;
   traceContent: boolean | undefined;
   instrumentFetch: boolean;
+  instrumentModules: InstrumentModules | undefined;
+  /** Tier-3 gate — env-only (`AGENTGRAPH_INSTRUMENT_SDKS=true`, DESIGN §3
+   * tier 3): loader hooks are opt-in by explicit operator action, never API. */
+  instrumentSdks: boolean;
   /** TEST-ONLY, env-only (`AGENTGRAPH_TEST_MATCH_ORIGIN`) — deliberately
    * absent from {@link InitOptions} so it cannot creep into app code. */
   testMatchOrigins: Record<string, string> | undefined;
@@ -70,6 +88,8 @@ export function resolveConfig(
     disableBatch: options.disableBatch ?? fromEnv.disableBatch ?? false,
     traceContent: options.traceContent ?? fromEnv.traceContent,
     instrumentFetch: options.instrumentFetch ?? true,
+    instrumentModules: options.instrumentModules,
+    instrumentSdks: fromEnv.instrumentSdks ?? false,
     testMatchOrigins: fromEnv.testMatchOrigins,
   };
 }

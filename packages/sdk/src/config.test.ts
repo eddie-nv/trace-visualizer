@@ -109,3 +109,27 @@ describe("testMatchOrigins (test-only override)", () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("test"));
   });
 });
+
+describe("instrumentModules / instrumentSdks (M6 tiers 2-3)", () => {
+  it("passes instrumentModules through from options", () => {
+    const anthropic = { fake: true };
+
+    const config = resolveConfig({ instrumentModules: { anthropic } }, {});
+
+    expect(config.instrumentModules).toEqual({ anthropic });
+  });
+
+  it("defaults instrumentModules to undefined", () => {
+    expect(resolveConfig(undefined, {}).instrumentModules).toBeUndefined();
+  });
+
+  it("instrumentSdks is env-only and strict: true only on the literal 'true'", () => {
+    expect(resolveConfig(undefined, {}).instrumentSdks).toBe(false);
+    expect(resolveConfig(undefined, { AGENTGRAPH_INSTRUMENT_SDKS: "true" }).instrumentSdks).toBe(
+      true,
+    );
+    expect(resolveConfig(undefined, { AGENTGRAPH_INSTRUMENT_SDKS: "1" }).instrumentSdks).toBe(
+      false,
+    );
+  });
+});

@@ -36,7 +36,9 @@ const REGISTER_DIST = fileURLToPath(
 const BASE_PORT = 18791;
 const ONE_LINE_AGENT_ID = "test-agent";
 const CONTEXT_PROBE = "scripts/test-b/q1-context-probe.ts";
+const TIER3_PROBE = "scripts/test-b/tier3-probe.ts";
 const PROBE_TIMEOUT_MS = 30_000;
+const TIER2_AGENT_ID = "tier2-agent";
 
 /** Q1's second half: context.with across async boundaries, per runtime. */
 function runContextProbe(runtime: "node" | "bun"): Evidence {
@@ -59,6 +61,28 @@ function runContextProbe(runtime: "node" | "bun"): Evidence {
     );
   }
   return { criterion: `Q1 context propagation (${runtime})`, detail: result.stdout.trim() };
+}
+
+/** M6 tier 3: real loader-hook interception of a post-init SDK import. Node-only. */
+function runTier3Probe(): Evidence {
+  const cleanEnv = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key, value]) => value !== undefined && !key.startsWith("AGENTGRAPH_"),
+    ),
+  ) as Record<string, string>;
+  const result = spawnSync(process.execPath, [TIER3_PROBE], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    env: { ...cleanEnv, AGENTGRAPH_INSTRUMENT_SDKS: "true" },
+    timeout: PROBE_TIMEOUT_MS,
+  });
+  if (result.status !== 0) {
+    const spawnFailure = result.error === undefined ? "" : ` (${result.error.message})`;
+    throw new Error(
+      `tier-3 probe failed (status ${result.status})${spawnFailure}:\n${result.stderr}`,
+    );
+  }
+  return { criterion: "M6 tier-3 module hooks (node)", detail: result.stdout.trim() };
 }
 
 async function preflight(): Promise<void> {
@@ -100,7 +124,7 @@ async function main(): Promise<void> {
         ...overrides,
       });
 
-    console.log("Test B: running 6 legs against mock at", mock.origin);
+    console.log("Test B: running 8 legs against mock at", mock.origin);
     const nodeBaseline = await leg("node-baseline", {}, 0);
     const nodePreload = await leg(
       "node-preload",
@@ -127,6 +151,18 @@ async function main(): Promise<void> {
       { entry: "server-one-line.ts", serviceName: `tb-oneline-${runId}` },
       5,
     );
+    // M6: tier-2 prototype patching with the tier-1 hook ALSO active — the
+    // exact-2-span assertions below are the live §3.4 dedup gate.
+    const tier2Node = await leg(
+      "node-tier2",
+      { entry: "server-tier2.ts", serviceName: `tb-tier2-node-${runId}` },
+      6,
+    );
+    const tier2Bun = await leg(
+      "bun-tier2",
+      { runtime: "bun", entry: "server-tier2.ts", serviceName: `tb-tier2-bun-${runId}` },
+      7,
+    );
 
     const evidence: Evidence[] = [];
     evidence.push(assertSpanAttributes(nodePreload));
@@ -145,6 +181,24 @@ async function main(): Promise<void> {
     evidence.push(assertByteIdentity(bunBaseline, bunPreload));
     evidence.push(assertSpanAttributes(oneLine));
     evidence.push(assertAgentId(oneLine, ONE_LINE_AGENT_ID));
+    // M6 tier 2: attribute + parity asserts include the exact-2-span count,
+    // so a dedup failure (4 spans) or a lost span (1) both fail loudly.
+    const tier2NodeAttrs = assertSpanAttributes(tier2Node);
+    assertUsageParity(tier2Node);
+    evidence.push({
+      criterion: "M6 tier-2 dedup (node)",
+      detail: `${tier2NodeAttrs.detail}; exactly one span per call with BOTH tiers active`,
+    });
+    evidence.push(assertByteIdentity(nodeBaseline, tier2Node));
+    evidence.push(assertAgentId(tier2Node, TIER2_AGENT_ID));
+    const tier2BunAttrs = assertSpanAttributes(tier2Bun);
+    assertUsageParity(tier2Bun);
+    evidence.push({
+      criterion: "M6 tier-2 dedup (bun)",
+      detail: `${tier2BunAttrs.detail}; prototype patching + dedup hold under Bun ${bunVersion()}`,
+    });
+    evidence.push(assertByteIdentity(bunBaseline, tier2Bun));
+    evidence.push(runTier3Probe());
     evidence.push(runContextProbe("node"));
     evidence.push(runContextProbe("bun"));
 
