@@ -85,8 +85,11 @@ describe("register", () => {
     // Assert
     expect(act).not.toThrow();
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("agentgraph"));
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("invalid endpoint"));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("agentgraph"), expect.any(Error));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("invalid endpoint"),
+      expect.any(Error),
+    );
   });
 
   it("does not warn again when re-registered after a failure", () => {
@@ -119,6 +122,36 @@ describe("register", () => {
     // Assert
     expect(act).not.toThrow();
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("string failure"));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("string failure"),
+      "string failure",
+    );
+  });
+
+  it("calls init when the registered flag is explicitly false, not just absent", () => {
+    // Arrange
+    const initFn = vi.fn();
+    const globalObj: AgentGraphGlobalCarrier = { __AGENTGRAPH__: { registered: false } };
+
+    // Act
+    register({ initFn, globalObj });
+
+    // Assert
+    expect(initFn).toHaveBeenCalledTimes(1);
+    expect(globalObj.__AGENTGRAPH__?.registered).toBe(true);
+  });
+
+  it("does not throw even when console.warn itself throws", () => {
+    // Arrange — a host may replace console.warn with a throwing stub
+    warnSpy.mockImplementation(() => {
+      throw new Error("console is broken");
+    });
+    const initFn = vi.fn(() => {
+      throw new Error("init failure");
+    });
+    const globalObj: AgentGraphGlobalCarrier = {};
+
+    // Act / Assert
+    expect(() => register({ initFn, globalObj })).not.toThrow();
   });
 });

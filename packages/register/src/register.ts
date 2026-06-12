@@ -7,7 +7,7 @@ import { init } from "@agentgraph/sdk";
  * dedupe them — only a true global can.
  */
 export interface AgentGraphGlobalState {
-  registered?: boolean;
+  readonly registered?: boolean;
 }
 
 /** Anything that can carry the global flag — `globalThis` in production. */
@@ -37,7 +37,18 @@ export function register(options: RegisterOptions = {}): void {
     globalObj.__AGENTGRAPH__ = { ...globalObj.__AGENTGRAPH__, registered: true };
     initFn();
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    console.warn(`agentgraph: preload registration failed; tracing is disabled (${detail})`);
+    warnRegistrationFailure(error);
+  }
+}
+
+function warnRegistrationFailure(error: unknown): void {
+  const detail = error instanceof Error ? error.message : String(error);
+  try {
+    // The raw error rides along as a second argument so Node/Bun print the
+    // stack — in a preload there is no other diagnostic channel.
+    console.warn(`agentgraph: preload registration failed; tracing is disabled (${detail})`, error);
+  } catch {
+    // console.warn itself was removed or replaced with a throwing stub;
+    // absorbing is the only option that honors never-crash-the-host (DESIGN §1).
   }
 }

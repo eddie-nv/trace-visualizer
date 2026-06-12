@@ -1,10 +1,17 @@
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@agentgraph/sdk", () => ({ init: vi.fn() }));
 
 interface FlagCarrier {
   __AGENTGRAPH__?: { registered?: boolean };
 }
+
+// Each test arranges its own registry + global-flag state so the suite is
+// order-independent: the entry's side effect runs on (re-)import.
+beforeEach(() => {
+  vi.resetModules();
+  delete (globalThis as FlagCarrier).__AGENTGRAPH__;
+});
 
 afterAll(() => {
   delete (globalThis as FlagCarrier).__AGENTGRAPH__;
@@ -22,17 +29,16 @@ describe("@agentgraph/register", () => {
     expect((globalThis as FlagCarrier).__AGENTGRAPH__?.registered).toBe(true);
   });
 
-  it("re-importing after a module reset is a no-op thanks to the global flag", async () => {
-    // Arrange — simulates a second copy of the entry loading in the same process
-    await import("@agentgraph/register");
-    vi.resetModules();
+  it("does not re-init when a prior copy already set the global flag", async () => {
+    // Arrange — as if the twin entry already registered in this process
+    (globalThis as FlagCarrier).__AGENTGRAPH__ = { registered: true };
+    const sdk = await import("@agentgraph/sdk");
+    vi.mocked(sdk.init).mockClear();
 
-    // Act — resetModules keeps the mock registry, so drop the earlier call first
-    const freshSdk = await import("@agentgraph/sdk");
-    vi.mocked(freshSdk.init).mockClear();
+    // Act
     await import("@agentgraph/register");
 
     // Assert
-    expect(freshSdk.init).not.toHaveBeenCalled();
+    expect(sdk.init).not.toHaveBeenCalled();
   });
 });

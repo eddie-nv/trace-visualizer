@@ -16,6 +16,8 @@ import { fileURLToPath } from "node:url";
 const HOST_MARKER = "host-alive";
 const WARN_MARKER = "agentgraph:";
 const HOST_FIXTURE = fileURLToPath(new URL("./fixtures/preload-host.mjs", import.meta.url));
+// Preload + trivial host completes in well under a second; anything longer is a hang.
+const SUBPROCESS_TIMEOUT_MS = 30_000;
 
 interface SmokeResult {
   status: number | null;
@@ -28,9 +30,15 @@ function runHost(
   args: string[],
   extraEnv: Record<string, string> = {},
 ): SmokeResult {
+  // Strip inherited AGENTGRAPH_* vars so a developer's shell config cannot
+  // add warnings (or silence failures) the assertions don't expect.
+  const cleanEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("AGENTGRAPH_")),
+  );
   const { status, stdout, stderr, error } = spawnSync(command, args, {
     encoding: "utf8",
-    env: { ...process.env, ...extraEnv },
+    env: { ...cleanEnv, ...extraEnv },
+    timeout: SUBPROCESS_TIMEOUT_MS,
   });
   if (error !== undefined) {
     throw new Error(`failed to spawn ${command}: ${error.message}`);
@@ -45,6 +53,7 @@ function countWarnLines(stderr: string): number {
 }
 
 function assertHostSurvived(result: SmokeResult, label: string): void {
+  assert.notEqual(result.status, null, `${label}: subprocess timed out or was killed`);
   assert.equal(
     result.status,
     0,
