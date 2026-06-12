@@ -6,7 +6,8 @@
     "node": ">=22.6.0"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "test-apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
@@ -20,7 +21,8 @@
     "jaeger:down": "docker compose down",
     "smoke:runtime": "node scripts/runtime-smoke.ts",
     "smoke:register": "node scripts/register-smoke.ts",
-    "smoke:jaeger": "node scripts/jaeger-smoke.ts"
+    "smoke:jaeger": "node scripts/jaeger-smoke.ts",
+    "test:b": "node scripts/test-b/run.ts"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
