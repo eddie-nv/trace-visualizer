@@ -26,7 +26,11 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean"
   },
   "dependencies": {
-    "@agentgraph/core": "*"
+    "@agentgraph/core": "*",
+    "@opentelemetry/context-async-hooks": "^2.8.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-trace-base": "^2.8.0"
   },
   "peerDependencies": {
     "@opentelemetry/api": "^1.9.0"
