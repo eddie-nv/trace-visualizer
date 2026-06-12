@@ -25,7 +25,8 @@ export function setJsonAttribute(span: Span, key: string, value: unknown): void 
     span.setAttribute(key, JSON.stringify(value));
   } catch {
     // Circular or otherwise unserializable content — drop the attribute
-    // rather than fail the emission path.
+    // rather than fail the emission path, but leave a visible marker.
+    span.setAttribute(ATTR.WARN, `${key} not serializable; attribute dropped`);
   }
 }
 

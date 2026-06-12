@@ -2,7 +2,12 @@ import { context, SpanKind, SpanStatusCode, trace, type Span } from "@openteleme
 import { ATTR } from "./attributes.js";
 import { shouldSendContent, type CoreConfig } from "./content-gating.js";
 import { computeAgentFingerprint } from "./fingerprint.js";
-import type { ParsedRequest, ParsedResponse, ProviderAdapter } from "./provider-types.js";
+import {
+  isRecord,
+  type ParsedRequest,
+  type ParsedResponse,
+  type ProviderAdapter,
+} from "./provider-types.js";
 import { matchProviderAdapter } from "./providers.js";
 import {
   applyUsage,
@@ -24,13 +29,23 @@ const OPERATION = "chat";
 const WARN_ATTRIBUTE = ATTR.WARN;
 const WARN_PREFIX = "[agentgraph]";
 
+/**
+ * Cheap reject-first filter so non-LLM traffic never pays for a WHATWG URL
+ * parse. Must stay a superset of the hosts the provider adapters match —
+ * false positives just fall through to the real matcher; false negatives
+ * would drop spans.
+ */
+const PROVIDER_HOST_HINT = /api\.(?:anthropic|openai)\.com/;
+
 interface HookState {
   readonly original: Fetch;
   readonly wrapper: Fetch;
 }
 
+// Intentional module-level singleton: the hook patches the process-global
+// fetch, so its install state is inherently global. Reset via uninstrumentFetch.
 let hookState: HookState | undefined;
-let hasWarnedDisplaced = false;
+let warnedKeys = new Set<string>();
 
 /**
  * Tier-1 instrumentation (DESIGN §3): idempotently patches `globalThis.fetch`
@@ -39,7 +54,8 @@ let hasWarnedDisplaced = false;
  * call — the hook must never crash or alter the host app.
  *
  * Calling again while installed is a no-op that re-checks for displacement
- * (a user-overwritten fetch) and warns once if found.
+ * (a user-overwritten fetch) and warns once if found; the wrapper itself also
+ * performs this check per call so displacement surfaces without a re-init.
  */
 export function instrumentFetch(config?: CoreConfig): void {
   if (hookState !== undefined) {
@@ -48,7 +64,7 @@ export function instrumentFetch(config?: CoreConfig): void {
   }
   const original = globalThis.fetch;
   if (typeof original !== "function") {
-    warn("globalThis.fetch is unavailable; fetch hook not installed");
+    warnOnce("no-fetch", "globalThis.fetch is unavailable; fetch hook not installed");
     return;
   }
   const wrapper = createWrapper(original, config);
@@ -69,26 +85,55 @@ export function uninstrumentFetch(): void {
     globalThis.fetch = hookState.original;
   }
   hookState = undefined;
-  hasWarnedDisplaced = false;
+  warnedKeys = new Set();
 }
 
 function warnOnceIfDisplaced(): void {
-  if (hasWarnedDisplaced || hookState === undefined || globalThis.fetch === hookState.wrapper) {
-    return;
+  if (hookState !== undefined && globalThis.fetch !== hookState.wrapper) {
+    warnOnce(
+      "displaced",
+      "globalThis.fetch was replaced after instrumentation; LLM spans may be missing",
+    );
   }
-  hasWarnedDisplaced = true;
-  warn("globalThis.fetch was replaced after instrumentation; LLM spans may be missing");
 }
 
-function warn(message: string): void {
+function warnOnce(key: string, message: string): void {
+  if (warnedKeys.has(key)) {
+    return;
+  }
+  warnedKeys.add(key);
   // eslint-disable-next-line no-console -- the documented degrade channel (DESIGN §1, Sentry pattern)
   console.warn(`${WARN_PREFIX} ${message}`);
 }
 
 function createWrapper(original: Fetch, config: CoreConfig | undefined): Fetch {
   return function agentgraphFetch(input: FetchInput, init?: FetchInit): Promise<Response> {
-    return instrumentedCall(original, config, input, init);
+    // Synchronous pre-gate: non-matching calls return the original promise
+    // directly — no async wrapper, no added microtask hops (DESIGN §3).
+    let adapter: ProviderAdapter | undefined;
+    try {
+      warnOnceIfDisplaced();
+      adapter = matchRequest(input, init);
+    } catch {
+      adapter = undefined;
+    }
+    if (adapter === undefined) {
+      return original(input, init);
+    }
+    return instrumentedCall(original, config, adapter, input, init);
   };
+}
+
+function matchRequest(input: FetchInput, init?: FetchInit): ProviderAdapter | undefined {
+  const url = parseRequestUrl(input);
+  if (url === undefined) {
+    return undefined;
+  }
+  const adapter = matchProviderAdapter(url, requestMethod(input, init));
+  if (adapter === undefined || isFetchSpanSuppressed(context.active())) {
+    return undefined;
+  }
+  return adapter;
 }
 
 interface SpanObservation {
@@ -103,13 +148,16 @@ interface SpanObservation {
 async function instrumentedCall(
   original: Fetch,
   config: CoreConfig | undefined,
+  adapter: ProviderAdapter,
   input: FetchInput,
-  init?: RequestInit,
+  init?: FetchInit,
 ): Promise<Response> {
   let observation: SpanObservation | undefined;
   try {
-    observation = await beginObservation(config, input, init);
+    observation = await beginObservation(config, adapter, input, init);
   } catch {
+    // No span exists yet, so the only visibility channel is the console.
+    warnOnce("span-setup", "failed to start an LLM span; matched calls are not being traced");
     observation = undefined;
   }
   if (observation === undefined) {
@@ -128,6 +176,7 @@ async function instrumentedCall(
   try {
     observeResponse(observation, response);
   } catch {
+    observation.span.setAttribute(WARN_ATTRIBUTE, "response observation failed");
     observation.span.end();
   }
   return response;
@@ -135,18 +184,10 @@ async function instrumentedCall(
 
 async function beginObservation(
   config: CoreConfig | undefined,
+  adapter: ProviderAdapter,
   input: FetchInput,
-  init?: RequestInit,
-): Promise<SpanObservation | undefined> {
-  const url = parseRequestUrl(input);
-  if (url === undefined) {
-    return undefined;
-  }
-  const adapter = matchProviderAdapter(url, requestMethod(input, init));
-  if (adapter === undefined || isFetchSpanSuppressed(context.active())) {
-    return undefined;
-  }
-
+  init?: FetchInit,
+): Promise<SpanObservation> {
   const parsed = parseRequestBody(adapter, await readRequestBodyText(input, init));
   const sendContent = shouldSendContent(config, context.active());
   const span = startLLMSpan(adapter, parsed, sendContent);
@@ -156,13 +197,13 @@ async function beginObservation(
 function parseRequestUrl(input: FetchInput): URL | undefined {
   try {
     if (typeof input === "string") {
-      return new URL(input);
+      return PROVIDER_HOST_HINT.test(input) ? new URL(input) : undefined;
     }
     if (input instanceof URL) {
       return input;
     }
     if (input instanceof Request) {
-      return new URL(input.url);
+      return PROVIDER_HOST_HINT.test(input.url) ? new URL(input.url) : undefined;
     }
     return new URL(String(input));
   } catch {
@@ -177,7 +218,7 @@ function requestMethod(input: FetchInput, init?: FetchInit): string {
 
 async function readRequestBodyText(
   input: FetchInput,
-  init?: RequestInit,
+  init?: FetchInit,
 ): Promise<string | undefined> {
   if (typeof init?.body === "string") {
     return init.body;
@@ -186,6 +227,9 @@ async function readRequestBodyText(
     if (input.bodyUsed) {
       return undefined;
     }
+    // clone() leaves the original Request consumable per spec. For a
+    // streaming Request body this buffers the clone fully before dispatch —
+    // an accepted cost of body inspection on matched (network-bound) calls.
     return input.clone().text();
   }
   return undefined;
@@ -200,9 +244,7 @@ function parseRequestBody(
   }
   try {
     const json: unknown = JSON.parse(bodyText);
-    return typeof json === "object" && json !== null
-      ? adapter.parseRequest(json as Record<string, unknown>)
-      : undefined;
+    return isRecord(json) ? adapter.parseRequest(json) : undefined;
   } catch {
     return undefined;
   }
@@ -275,17 +317,22 @@ function observeResponse(observation: SpanObservation, response: Response): void
 
   // clone() tees the body internally: the caller keeps the original response
   // (byte-identical, same object) while we read the clone in the background.
+  // The clone MUST happen here, synchronously before the wrapper's promise
+  // resolves to the caller — afterwards the caller may have consumed the body.
   let branch: Response;
   try {
     branch = response.clone();
   } catch {
+    span.setAttribute(WARN_ATTRIBUTE, "response clone failed; response attributes not captured");
     span.end();
     return;
   }
+  // Background tasks: both callees own span.end() via finally and never
+  // reject; the catch is a belt-and-braces guard for future refactors.
   if (isEventStream(response)) {
-    void finishStreaming(observation, branch);
+    void finishStreaming(observation, branch).catch(() => {});
   } else {
-    void finishJson(observation, branch);
+    void finishJson(observation, branch).catch(() => {});
   }
 }
 
@@ -308,13 +355,16 @@ async function finishJson(observation: SpanObservation, branch: Response): Promi
 async function finishStreaming(observation: SpanObservation, branch: Response): Promise<void> {
   const { span, adapter } = observation;
   const accumulator = adapter.createStreamAccumulator();
+  let eventFailures = 0;
   try {
     if (branch.body !== null) {
       for await (const event of parseSseStream(branch.body)) {
         try {
           accumulator.onEvent(event);
         } catch {
-          // One malformed event must not abort accumulation of the rest.
+          // Adapters tolerate non-JSON data themselves, so a throw here is an
+          // accumulator bug; count it so the span shows the loss.
+          eventFailures += 1;
         }
       }
     }
@@ -326,10 +376,13 @@ async function finishStreaming(observation: SpanObservation, branch: Response): 
     try {
       applyParsedResponse(observation, accumulator.finish());
     } catch {
-      // Partial state could not be finalized — the error below still lands.
+      span.setAttribute(WARN_ATTRIBUTE, "stream accumulator failed during error recovery");
     }
     recordSpanError(span, error);
   } finally {
+    if (eventFailures > 0) {
+      span.setAttribute(WARN_ATTRIBUTE, `${eventFailures} SSE event(s) could not be processed`);
+    }
     span.end();
   }
 }

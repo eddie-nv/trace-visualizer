@@ -14,6 +14,13 @@ export interface SseEvent {
 const EVENT_BOUNDARY = /\r?\n\r?\n/;
 const LINE_BREAK = /\r?\n/;
 
+/**
+ * Bail-out cap for a single unterminated block. Real provider events are a
+ * few KB; a buffer this large means the stream is not well-formed SSE, and
+ * continuing would grow memory unboundedly (and rescan it quadratically).
+ */
+const MAX_BUFFER_LENGTH = 1024 * 1024;
+
 export async function* parseSseStream(
   stream: ReadableStream<Uint8Array>,
 ): AsyncGenerator<SseEvent, void, undefined> {
@@ -36,6 +43,12 @@ export async function* parseSseStream(
           yield event;
         }
         boundary = EVENT_BOUNDARY.exec(buffer);
+      }
+      if (buffer.length > MAX_BUFFER_LENGTH) {
+        // Cancel (not just stop reading) so the teed source does not keep
+        // queueing chunks for this abandoned branch.
+        await reader.cancel();
+        return;
       }
     }
     buffer += decoder.decode();

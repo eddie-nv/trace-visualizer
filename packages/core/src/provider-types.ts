@@ -55,7 +55,7 @@ export interface ProviderAdapter {
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function asNonEmptyString(value: unknown): string | undefined {
@@ -64,4 +64,13 @@ export function asNonEmptyString(value: unknown): string | undefined {
 
 export function asFiniteNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** Non-JSON SSE data lines are protocol noise, not errors, at the adapter layer. */
+export function tolerantJsonParse(data: string): unknown {
+  try {
+    return JSON.parse(data);
+  } catch {
+    return undefined;
+  }
 }

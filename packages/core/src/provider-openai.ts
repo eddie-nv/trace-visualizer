@@ -3,6 +3,7 @@ import {
   asFiniteNumber,
   asNonEmptyString,
   isRecord,
+  tolerantJsonParse,
   type ParsedRequest,
   type ParsedResponse,
   type ProviderAdapter,
@@ -20,7 +21,10 @@ export const openaiAdapter: ProviderAdapter = {
 
   isMatch(url, method) {
     return (
-      method === "POST" && url.hostname === OPENAI_HOST && url.pathname === CHAT_COMPLETIONS_PATH
+      url.protocol === "https:" &&
+      method === "POST" &&
+      url.hostname === OPENAI_HOST &&
+      url.pathname === CHAT_COMPLETIONS_PATH
     );
   },
 
@@ -128,7 +132,7 @@ class OpenAIStreamAccumulator implements StreamAccumulator {
     if (event.data === SSE_DONE_SENTINEL) {
       return;
     }
-    const payload: unknown = JSON.parse(event.data);
+    const payload = tolerantJsonParse(event.data);
     if (!isRecord(payload)) {
       return;
     }

@@ -3,6 +3,7 @@ import {
   asFiniteNumber,
   asNonEmptyString,
   isRecord,
+  tolerantJsonParse,
   type ParsedRequest,
   type ParsedResponse,
   type ProviderAdapter,
@@ -19,7 +20,12 @@ export const anthropicAdapter: ProviderAdapter = {
   providerName: "anthropic",
 
   isMatch(url, method) {
-    return method === "POST" && url.hostname === ANTHROPIC_HOST && url.pathname === MESSAGES_PATH;
+    return (
+      url.protocol === "https:" &&
+      method === "POST" &&
+      url.hostname === ANTHROPIC_HOST &&
+      url.pathname === MESSAGES_PATH
+    );
   },
 
   parseRequest(body): ParsedRequest {
@@ -112,7 +118,7 @@ class AnthropicStreamAccumulator implements StreamAccumulator {
   private blocks = new Map<number, ContentBlockState>();
 
   onEvent(event: SseEvent): void {
-    const payload: unknown = JSON.parse(event.data);
+    const payload = tolerantJsonParse(event.data);
     if (!isRecord(payload)) {
       return;
     }
@@ -229,7 +235,14 @@ function tryParseJson(text: string): unknown {
 }
 
 function definedFields(usage: Usage): Partial<Usage> {
-  return Object.fromEntries(
-    Object.entries(usage).filter(([, value]) => value !== undefined),
-  ) as Partial<Usage>;
+  return {
+    ...(usage.inputTokens === undefined ? {} : { inputTokens: usage.inputTokens }),
+    ...(usage.outputTokens === undefined ? {} : { outputTokens: usage.outputTokens }),
+    ...(usage.cacheCreationInputTokens === undefined
+      ? {}
+      : { cacheCreationInputTokens: usage.cacheCreationInputTokens }),
+    ...(usage.cacheReadInputTokens === undefined
+      ? {}
+      : { cacheReadInputTokens: usage.cacheReadInputTokens }),
+  };
 }

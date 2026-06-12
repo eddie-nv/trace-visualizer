@@ -229,6 +229,19 @@ describe("passthrough", () => {
     expect(exporter.getFinishedSpans()).toHaveLength(0);
   });
 
+  it("passes non-https provider URLs through without a span", async () => {
+    const mock = installFetchMock(async () => jsonResponse(ANTHROPIC_RESPONSE_BODY));
+    instrumentFetch();
+
+    await globalThis.fetch("http://api.anthropic.com/v1/messages", {
+      method: "POST",
+      body: JSON.stringify(ANTHROPIC_REQUEST_BODY),
+    });
+
+    expect(mock).toHaveBeenCalledTimes(1);
+    expect(exporter.getFinishedSpans()).toHaveLength(0);
+  });
+
   it("skips span creation when SUPPRESS_FETCH_SPAN_KEY is set on the active context", async () => {
     const mock = installFetchMock(async () => jsonResponse(ANTHROPIC_RESPONSE_BODY));
     instrumentFetch();
@@ -619,6 +632,23 @@ describe("anthropic streaming", () => {
     // teed stream errors, the spec resets branch queues, so chunks our
     // background reader has not yet dequeued are discarded.
     expect(span.attributes[ATTR.REQUEST_MODEL]).toBe("claude-sonnet-4-6");
+  });
+});
+
+describe("sse stream abuse", () => {
+  it("stops parsing an unterminated mega-block while the caller still gets every byte", async () => {
+    // > 1 MiB without an SSE delimiter: the parser must bail out instead of
+    // buffering (and rescanning) unboundedly; the caller's branch is untouched.
+    const megaBlock = "x".repeat(700_000);
+    installFetchMock(async () => sseResponse([megaBlock, megaBlock]));
+    instrumentFetch();
+
+    const response = await postJson(ANTHROPIC_URL, { ...ANTHROPIC_REQUEST_BODY, stream: true });
+
+    expect(await response.text()).toBe(megaBlock + megaBlock);
+    const span = await waitForSingleSpan();
+    expect(span.attributes[ATTR.REQUEST_MODEL]).toBe("claude-sonnet-4-6");
+    expect(span.attributes[ATTR.USAGE_INPUT_TOKENS]).toBeUndefined();
   });
 });
 
