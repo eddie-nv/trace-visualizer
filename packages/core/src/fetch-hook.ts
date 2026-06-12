@@ -1,24 +1,12 @@
-import { context, SpanKind, SpanStatusCode, trace, type Span } from "@opentelemetry/api";
+import { context, SpanStatusCode, type Span } from "@opentelemetry/api";
 import { ATTR } from "./attributes.js";
 import { shouldSendContent, type CoreConfig } from "./content-gating.js";
-import { computeAgentFingerprint } from "./fingerprint.js";
-import {
-  isRecord,
-  type ParsedRequest,
-  type ParsedResponse,
-  type ProviderAdapter,
-} from "./provider-types.js";
+import { isRecord, type ParsedRequest, type ProviderAdapter } from "./provider-types.js";
 import { matchProviderAdapter, type MatchOriginOverrides } from "./providers.js";
-import {
-  applyUsage,
-  recordSpanError,
-  setJsonAttribute,
-  setNumberAttribute,
-  setStringAttribute,
-} from "./span-attrs.js";
+import { recordSpanError } from "./span-attrs.js";
+import { applyParsedResponse, startLLMSpan } from "./span-lifecycle.js";
 import { parseSseStream } from "./sse.js";
 import { isFetchSpanSuppressed } from "./suppression.js";
-import { TRACER_NAME } from "./tracer.js";
 
 /** Config for {@link instrumentFetch}: content gating plus the test-only
  * origin override (see {@link MatchOriginOverrides} for the warning). */
@@ -30,8 +18,6 @@ type Fetch = typeof globalThis.fetch;
 type FetchInput = Parameters<Fetch>[0];
 type FetchInit = Parameters<Fetch>[1];
 
-/** Both matched endpoints are chat completions (DESIGN §2.1). */
-const OPERATION = "chat";
 const WARN_ATTRIBUTE = ATTR.WARN;
 const WARN_PREFIX = "[agentgraph]";
 
@@ -277,59 +263,6 @@ function parseRequestBody(
   }
 }
 
-function startLLMSpan(
-  adapter: ProviderAdapter,
-  parsed: ParsedRequest | undefined,
-  sendContent: boolean,
-): Span {
-  const tracer = trace.getTracer(TRACER_NAME);
-  const span = tracer.startSpan(
-    parsed?.model === undefined ? OPERATION : `${OPERATION} ${parsed.model}`,
-    {
-      kind: SpanKind.CLIENT,
-      attributes: {
-        [ATTR.PROVIDER_NAME]: adapter.providerName,
-        [ATTR.OPERATION_NAME]: OPERATION,
-      },
-    },
-  );
-  if (parsed === undefined) {
-    span.setAttribute(WARN_ATTRIBUTE, "request body not parseable");
-    return span;
-  }
-  setStringAttribute(span, ATTR.REQUEST_MODEL, parsed.model);
-  setNumberAttribute(span, ATTR.REQUEST_MAX_TOKENS, parsed.maxTokens);
-  setNumberAttribute(span, ATTR.REQUEST_TEMPERATURE, parsed.temperature);
-  setNumberAttribute(span, ATTR.REQUEST_TOP_P, parsed.topP);
-  setNumberAttribute(span, ATTR.REQUEST_TOP_K, parsed.topK);
-  setNumberAttribute(span, ATTR.REQUEST_FREQUENCY_PENALTY, parsed.frequencyPenalty);
-  setNumberAttribute(span, ATTR.REQUEST_PRESENCE_PENALTY, parsed.presencePenalty);
-  applyFingerprint(span, adapter.providerName, parsed);
-  if (sendContent) {
-    setJsonAttribute(span, ATTR.INPUT_MESSAGES, parsed.messages);
-    setJsonAttribute(span, ATTR.SYSTEM_INSTRUCTIONS, parsed.systemInstructions);
-    setJsonAttribute(span, ATTR.TOOL_DEFINITIONS, parsed.toolDefinitions);
-  }
-  return span;
-}
-
-function applyFingerprint(span: Span, provider: string, parsed: ParsedRequest): void {
-  if (parsed.model === undefined) {
-    return;
-  }
-  try {
-    const input = {
-      provider,
-      model: parsed.model,
-      ...(parsed.toolNames === undefined ? {} : { toolNames: parsed.toolNames }),
-      ...(parsed.systemPromptText === undefined ? {} : { systemPrompt: parsed.systemPromptText }),
-    };
-    span.setAttribute(ATTR.AGENT_FINGERPRINT, computeAgentFingerprint(input));
-  } catch {
-    // Fingerprint is best-effort metadata (DESIGN Q4) — never fail the span.
-  }
-}
-
 function observeResponse(observation: SpanObservation, response: Response): void {
   const { span } = observation;
   if (!response.ok) {
@@ -371,7 +304,7 @@ async function finishJson(observation: SpanObservation, branch: Response): Promi
   const { span, adapter } = observation;
   try {
     const json: unknown = await branch.json();
-    applyParsedResponse(observation, adapter.parseResponse(json));
+    applyParsedResponse(span, observation.sendContent, adapter.parseResponse(json));
   } catch {
     span.setAttribute(WARN_ATTRIBUTE, "response body not parseable");
   } finally {
@@ -395,13 +328,13 @@ async function finishStreaming(observation: SpanObservation, branch: Response): 
         }
       }
     }
-    applyParsedResponse(observation, accumulator.finish());
+    applyParsedResponse(span, observation.sendContent, accumulator.finish());
   } catch (error) {
     // The caller's branch of the teed body fails with the same transport
     // error; rethrowing here would only produce an unhandled rejection in a
     // background task. Record what was accumulated, then the error.
     try {
-      applyParsedResponse(observation, accumulator.finish());
+      applyParsedResponse(span, observation.sendContent, accumulator.finish());
     } catch {
       span.setAttribute(WARN_ATTRIBUTE, "stream accumulator failed during error recovery");
     }
@@ -411,18 +344,5 @@ async function finishStreaming(observation: SpanObservation, branch: Response): 
       span.setAttribute(WARN_ATTRIBUTE, `${eventFailures} SSE event(s) could not be processed`);
     }
     span.end();
-  }
-}
-
-function applyParsedResponse(observation: SpanObservation, parsed: ParsedResponse): void {
-  const { span, sendContent } = observation;
-  setStringAttribute(span, ATTR.RESPONSE_ID, parsed.id);
-  setStringAttribute(span, ATTR.RESPONSE_MODEL, parsed.model);
-  if (parsed.finishReasons !== undefined && parsed.finishReasons.length > 0) {
-    span.setAttribute(ATTR.RESPONSE_FINISH_REASONS, [...parsed.finishReasons]);
-  }
-  applyUsage(span, parsed.usage);
-  if (sendContent) {
-    setJsonAttribute(span, ATTR.OUTPUT_MESSAGES, parsed.outputMessages);
   }
 }

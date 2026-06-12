@@ -45,6 +45,17 @@ export interface StreamAccumulator {
   finish(): ParsedResponse;
 }
 
+/**
+ * The tier-2 entry point to the same accumulation (DESIGN §3 tier 2): SDK
+ * stream re-wrapping sees already-parsed event objects, not SSE text. Both
+ * concrete accumulators implement this alongside {@link StreamAccumulator},
+ * whose `onEvent` is just the SSE-parsing adapter on top.
+ */
+export interface ParsedEventAccumulator {
+  onParsedEvent(payload: unknown): void;
+  finish(): ParsedResponse;
+}
+
 /** One supported provider endpoint (DESIGN §3 tier 1). */
 export interface ProviderAdapter {
   readonly providerName: string;
@@ -54,7 +65,7 @@ export interface ProviderAdapter {
   isMatch(url: URL, method: string): boolean;
   parseRequest(body: Record<string, unknown>): ParsedRequest;
   parseResponse(json: unknown): ParsedResponse;
-  createStreamAccumulator(): StreamAccumulator;
+  createStreamAccumulator(): StreamAccumulator & ParsedEventAccumulator;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

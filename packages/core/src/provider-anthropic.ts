@@ -4,6 +4,7 @@ import {
   asNonEmptyString,
   isRecord,
   tolerantJsonParse,
+  type ParsedEventAccumulator,
   type ParsedRequest,
   type ParsedResponse,
   type ProviderAdapter,
@@ -63,7 +64,7 @@ export const anthropicAdapter: ProviderAdapter = {
     };
   },
 
-  createStreamAccumulator(): StreamAccumulator {
+  createStreamAccumulator(): StreamAccumulator & ParsedEventAccumulator {
     return new AnthropicStreamAccumulator();
   },
 };
@@ -111,7 +112,7 @@ interface ContentBlockState {
  * id/model and initial usage, `message_delta` the final output tokens and
  * stop reason — merged with `Object.assign` semantics like OpenLLMetry.
  */
-class AnthropicStreamAccumulator implements StreamAccumulator {
+class AnthropicStreamAccumulator implements StreamAccumulator, ParsedEventAccumulator {
   private id: string | undefined;
   private model: string | undefined;
   private stopReason: string | undefined;
@@ -119,7 +120,10 @@ class AnthropicStreamAccumulator implements StreamAccumulator {
   private blocks = new Map<number, ContentBlockState>();
 
   onEvent(event: SseEvent): void {
-    const payload = tolerantJsonParse(event.data);
+    this.onParsedEvent(tolerantJsonParse(event.data));
+  }
+
+  onParsedEvent(payload: unknown): void {
     if (!isRecord(payload)) {
       return;
     }
