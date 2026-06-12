@@ -162,10 +162,11 @@ describe("StampingSpanProcessor", () => {
 });
 
 describe("context keys", () => {
-  it("are distinct symbols", () => {
-    const other = createContextKey("agentgraph.agent_id");
-    const keys = [AGENT_ID_KEY, CONVERSATION_ID_KEY, CHANNEL_TYPE_KEY, other];
+  it("are three distinct keys, stable across createContextKey calls (Symbol.for semantics)", () => {
+    const keys = [AGENT_ID_KEY, CONVERSATION_ID_KEY, CHANNEL_TYPE_KEY];
 
     expect(new Set(keys).size).toBe(keys.length);
+    // createContextKey registers by description — same description, same key.
+    expect(createContextKey("agentgraph.agent_id")).toBe(AGENT_ID_KEY);
   });
 });

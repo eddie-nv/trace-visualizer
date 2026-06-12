@@ -183,9 +183,12 @@ describe("init", () => {
       }),
     });
 
-    // Assert — content attrs dropped, usage metadata kept
+    // Assert — span ends after the hook consumes the response body
+    await vi.waitFor(() => {
+      expect(exporter.getFinishedSpans()).toHaveLength(1);
+    });
     const span = exporter.getFinishedSpans()[0];
-    expect(span).toBeDefined();
+    // content attrs dropped, usage metadata kept
     expect(span?.attributes[ATTR.INPUT_MESSAGES]).toBeUndefined();
     expect(span?.attributes[ATTR.OUTPUT_MESSAGES]).toBeUndefined();
     expect(span?.attributes[ATTR.USAGE_INPUT_TOKENS]).toBe(10);
