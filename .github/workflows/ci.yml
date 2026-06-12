@@ -45,3 +45,5 @@ jobs:
         run: node scripts/jaeger-smoke.ts
       - name: Jaeger export smoke (Bun)
         run: bun scripts/jaeger-smoke.ts
+      - name: Test B verification (Node + Bun legs, DESIGN §6)
+        run: node scripts/test-b/run.ts

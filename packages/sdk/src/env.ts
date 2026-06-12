@@ -15,6 +15,12 @@ export interface EnvOptions {
    * into tier-3 module hooks (wired in M6). `init()` deliberately ignores it.
    */
   instrumentSdks?: boolean;
+  /**
+   * TEST-ONLY (DESIGN §6 Test B): extra `provider=origin` matches for the
+   * fetch hook so an E2E harness can stand in a deterministic local mock of
+   * a provider endpoint. Never set in production.
+   */
+  testMatchOrigins?: Record<string, string>;
 }
 
 export type EnvSource = Record<string, string | undefined>;
@@ -34,7 +40,46 @@ export function readEnvOptions(env: EnvSource = process.env): EnvOptions {
     ...(env["AGENTGRAPH_DISABLE_BATCH"] === "true" && { disableBatch: true }),
     ...(env["AGENTGRAPH_AGENT_ID"] !== undefined && { agentId: env["AGENTGRAPH_AGENT_ID"] }),
     ...(env["AGENTGRAPH_INSTRUMENT_SDKS"] === "true" && { instrumentSdks: true }),
+    ...parseTestMatchOrigins(env["AGENTGRAPH_TEST_MATCH_ORIGIN"]),
   };
+}
+
+/**
+ * Parse the test-only `provider=origin[,provider=origin]` override. Values
+ * are normalized to their URL origin; malformed entries are dropped with a
+ * warning. Returns a spreadable fragment so an unset/empty var adds nothing.
+ */
+function parseTestMatchOrigins(raw: string | undefined): Pick<EnvOptions, "testMatchOrigins"> {
+  if (raw === undefined) {
+    return {};
+  }
+  const entries = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "")
+    .map(parseTestMatchOriginEntry)
+    .filter((pair): pair is [string, string] => pair !== undefined);
+  return entries.length === 0 ? {} : { testMatchOrigins: Object.fromEntries(entries) };
+}
+
+function parseTestMatchOriginEntry(entry: string): [string, string] | undefined {
+  const separator = entry.indexOf("=");
+  const provider = separator === -1 ? "" : entry.slice(0, separator).trim();
+  const value = separator === -1 ? "" : entry.slice(separator + 1).trim();
+  if (provider === "") {
+    console.warn(
+      `agentgraph: ignoring malformed AGENTGRAPH_TEST_MATCH_ORIGIN entry "${entry}" (expected "provider=origin")`,
+    );
+    return undefined;
+  }
+  try {
+    return [provider, new URL(value).origin];
+  } catch {
+    console.warn(
+      `agentgraph: ignoring AGENTGRAPH_TEST_MATCH_ORIGIN entry "${entry}" — origin is not a valid URL`,
+    );
+    return undefined;
+  }
 }
 
 /** RFC 9110 token chars — anything else in a key risks header injection. */

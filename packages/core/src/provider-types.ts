@@ -48,6 +48,9 @@ export interface StreamAccumulator {
 /** One supported provider endpoint (DESIGN §3 tier 1). */
 export interface ProviderAdapter {
   readonly providerName: string;
+  /** The endpoint path this adapter owns — used by the test-only origin
+   * override, which matches `POST <override-origin><matchPath>`. */
+  readonly matchPath: string;
   isMatch(url: URL, method: string): boolean;
   parseRequest(body: Record<string, unknown>): ParsedRequest;
   parseResponse(json: unknown): ParsedResponse;

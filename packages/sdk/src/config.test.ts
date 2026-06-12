@@ -85,3 +85,27 @@ describe("resolveConfig", () => {
     expect(warn).toHaveBeenCalled();
   });
 });
+
+describe("testMatchOrigins (test-only override)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is undefined by default", () => {
+    expect(resolveConfig(undefined, {}).testMatchOrigins).toBeUndefined();
+  });
+
+  it("is surfaced from the env var with a test-only warning", () => {
+    // Arrange
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Act
+    const config = resolveConfig(undefined, {
+      AGENTGRAPH_TEST_MATCH_ORIGIN: "anthropic=http://127.0.0.1:9999",
+    });
+
+    // Assert
+    expect(config.testMatchOrigins).toEqual({ anthropic: "http://127.0.0.1:9999" });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("test"));
+  });
+});

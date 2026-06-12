@@ -18,6 +18,7 @@ const SSE_DONE_SENTINEL = "[DONE]";
 /** `POST api.openai.com/v1/chat/completions` (DESIGN §3 tier 1). */
 export const openaiAdapter: ProviderAdapter = {
   providerName: "openai",
+  matchPath: CHAT_COMPLETIONS_PATH,
 
   isMatch(url, method) {
     return (

@@ -1,0 +1,11 @@
+{
+  "name": "bare-test-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Test B bare app (DESIGN §6): plain HTTP server using @anthropic-ai/sdk directly. server.ts has zero OTel imports; @agentgraph/sdk is consumed only by the one-line-tier entry (server-one-line.ts).",
+  "dependencies": {
+    "@agentgraph/sdk": "*",
+    "@anthropic-ai/sdk": "^0.104.1"
+  }
+}

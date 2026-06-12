@@ -18,6 +18,7 @@ const MESSAGES_PATH = "/v1/messages";
 /** `POST api.anthropic.com/v1/messages` — wire format per DESIGN §3/FINDINGS §4. */
 export const anthropicAdapter: ProviderAdapter = {
   providerName: "anthropic",
+  matchPath: MESSAGES_PATH,
 
   isMatch(url, method) {
     return (

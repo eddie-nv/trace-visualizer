@@ -8,7 +8,7 @@ import {
   type ParsedResponse,
   type ProviderAdapter,
 } from "./provider-types.js";
-import { matchProviderAdapter } from "./providers.js";
+import { matchProviderAdapter, type MatchOriginOverrides } from "./providers.js";
 import {
   applyUsage,
   recordSpanError,
@@ -19,6 +19,12 @@ import {
 import { parseSseStream } from "./sse.js";
 import { isFetchSpanSuppressed } from "./suppression.js";
 import { TRACER_NAME } from "./tracer.js";
+
+/** Config for {@link instrumentFetch}: content gating plus the test-only
+ * origin override (see {@link MatchOriginOverrides} for the warning). */
+export interface FetchHookConfig extends CoreConfig {
+  testMatchOrigins?: MatchOriginOverrides;
+}
 
 type Fetch = typeof globalThis.fetch;
 type FetchInput = Parameters<Fetch>[0];
@@ -57,7 +63,7 @@ let warnedKeys = new Set<string>();
  * (a user-overwritten fetch) and warns once if found; the wrapper itself also
  * performs this check per call so displacement surfaces without a re-init.
  */
-export function instrumentFetch(config?: CoreConfig): void {
+export function instrumentFetch(config?: FetchHookConfig): void {
   if (hookState !== undefined) {
     warnOnceIfDisplaced();
     return;
@@ -106,14 +112,15 @@ function warnOnce(key: string, message: string): void {
   console.warn(`${WARN_PREFIX} ${message}`);
 }
 
-function createWrapper(original: Fetch, config: CoreConfig | undefined): Fetch {
+function createWrapper(original: Fetch, config: FetchHookConfig | undefined): Fetch {
+  const overrides = config?.testMatchOrigins;
   return function agentgraphFetch(input: FetchInput, init?: FetchInit): Promise<Response> {
     // Synchronous pre-gate: non-matching calls return the original promise
     // directly — no async wrapper, no added microtask hops (DESIGN §3).
     let adapter: ProviderAdapter | undefined;
     try {
       warnOnceIfDisplaced();
-      adapter = matchRequest(input, init);
+      adapter = matchRequest(input, init, overrides);
     } catch {
       adapter = undefined;
     }
@@ -124,16 +131,33 @@ function createWrapper(original: Fetch, config: CoreConfig | undefined): Fetch {
   };
 }
 
-function matchRequest(input: FetchInput, init?: FetchInit): ProviderAdapter | undefined {
-  const url = parseRequestUrl(input);
+function matchRequest(
+  input: FetchInput,
+  init: FetchInit,
+  overrides: MatchOriginOverrides | undefined,
+): ProviderAdapter | undefined {
+  const url = parseRequestUrl(input, overrides);
   if (url === undefined) {
     return undefined;
   }
-  const adapter = matchProviderAdapter(url, requestMethod(input, init));
+  const adapter = matchProviderAdapter(url, requestMethod(input, init), overrides);
   if (adapter === undefined || isFetchSpanSuppressed(context.active())) {
     return undefined;
   }
   return adapter;
+}
+
+/** The reject-first hint, widened to any test-override origin when one is set. */
+function mayMatchProvider(candidate: string, overrides: MatchOriginOverrides | undefined): boolean {
+  if (PROVIDER_HOST_HINT.test(candidate)) {
+    return true;
+  }
+  if (overrides === undefined) {
+    return false;
+  }
+  // The "/" boundary keeps origin "http://h:80" from hinting "http://h:8080/…".
+  // A bare-origin candidate (no path) can never match an adapter path anyway.
+  return Object.values(overrides).some((origin) => candidate.startsWith(`${origin}/`));
 }
 
 interface SpanObservation {
@@ -194,16 +218,19 @@ async function beginObservation(
   return { span, adapter, sendContent };
 }
 
-function parseRequestUrl(input: FetchInput): URL | undefined {
+function parseRequestUrl(
+  input: FetchInput,
+  overrides: MatchOriginOverrides | undefined,
+): URL | undefined {
   try {
     if (typeof input === "string") {
-      return PROVIDER_HOST_HINT.test(input) ? new URL(input) : undefined;
+      return mayMatchProvider(input, overrides) ? new URL(input) : undefined;
     }
     if (input instanceof URL) {
       return input;
     }
     if (input instanceof Request) {
-      return PROVIDER_HOST_HINT.test(input.url) ? new URL(input.url) : undefined;
+      return mayMatchProvider(input.url, overrides) ? new URL(input.url) : undefined;
     }
     return new URL(String(input));
   } catch {

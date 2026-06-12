@@ -688,3 +688,43 @@ describe("openai streaming", () => {
     expect(span.attributes[ATTR.USAGE_OUTPUT_TOKENS]).toBe(5);
   });
 });
+
+describe("test match origin override", () => {
+  const MOCK_ORIGIN = "http://127.0.0.1:8788";
+
+  it("emits a span for an overridden origin and passes the response through", async () => {
+    // Arrange
+    installFetchMock(async () => jsonResponse(ANTHROPIC_RESPONSE_BODY));
+    instrumentFetch({ testMatchOrigins: { anthropic: MOCK_ORIGIN } });
+
+    // Act
+    const response = await postJson(`${MOCK_ORIGIN}/v1/messages`, ANTHROPIC_REQUEST_BODY);
+
+    // Assert
+    expect(response.status).toBe(200);
+    const span = await waitForSingleSpan();
+    expect(span.name).toBe("chat claude-sonnet-4-6");
+    expect(span.attributes[ATTR.PROVIDER_NAME]).toBe("anthropic");
+    expect(span.attributes[ATTR.USAGE_INPUT_TOKENS]).toBe(10);
+  });
+
+  it("does not trace other paths on the overridden origin", async () => {
+    installFetchMock(async () => jsonResponse({ ok: true }));
+    instrumentFetch({ testMatchOrigins: { anthropic: MOCK_ORIGIN } });
+
+    const response = await postJson(`${MOCK_ORIGIN}/healthz`, {});
+    await response.text();
+
+    expect(exporter.getFinishedSpans()).toHaveLength(0);
+  });
+
+  it("still matches the real provider host while an override is active", async () => {
+    installFetchMock(async () => jsonResponse(ANTHROPIC_RESPONSE_BODY));
+    instrumentFetch({ testMatchOrigins: { anthropic: MOCK_ORIGIN } });
+
+    await postJson(ANTHROPIC_URL, ANTHROPIC_REQUEST_BODY);
+
+    const span = await waitForSingleSpan();
+    expect(span.attributes[ATTR.PROVIDER_NAME]).toBe("anthropic");
+  });
+});
