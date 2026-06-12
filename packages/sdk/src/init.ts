@@ -68,8 +68,10 @@ export function init(options?: InitOptions): void {
     trace.setGlobalTracerProvider(provider);
     if (config.instrumentSdks) {
       // Tier 3 (DESIGN §3): after provider registration so hooked modules
-      // emit through it. activateTier3 never throws — loader-hook failures
-      // degrade to tier 1 with a warning.
+      // emit through it. activateTier3 never throws; both failure modes —
+      // loader hook unavailable (ESM-only loss) and instrumentation enabling
+      // failed (all of tier 3 lost) — degrade to tier 1 with their own
+      // distinct warnings, because the preload path must never crash a host.
       activateTier3({ traceContent: config.traceContent });
     }
     state = { provider, isFetchInstrumented: config.instrumentFetch, instrumentedModules };
@@ -87,14 +89,15 @@ export function init(options?: InitOptions): void {
  * `manuallyInstrument` degrades to a warn on bad shapes, so every entry is
  * recorded for symmetric un-instrumentation at shutdown. */
 function instrumentProvidedModules(config: ResolvedConfig): readonly InstrumentedModuleEntry[] {
-  if (config.instrumentModules === undefined) {
+  const modules = config.instrumentModules;
+  if (modules === undefined) {
     return [];
   }
   const providers: readonly InstrumentedProvider[] = ["anthropic", "openai"];
   return providers
-    .filter((provider) => config.instrumentModules?.[provider] !== undefined)
+    .filter((provider) => modules[provider] !== undefined)
     .map((provider) => {
-      const module = config.instrumentModules?.[provider];
+      const module = modules[provider];
       manuallyInstrument(provider, module, { traceContent: config.traceContent });
       return [provider, module] as const;
     });

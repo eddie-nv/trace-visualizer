@@ -48,9 +48,11 @@ export function activateTier3(config: CoreConfig, seams: Tier3Seams = {}): boole
         );
       }
     }
+    // `enabled` LAST: construction must never self-enable — only the
+    // registerInstrumentations call inside enableFn manages enablement.
     enableFn([
-      new AnthropicInstrumentation({ enabled: false, ...config }),
-      new OpenAIInstrumentation({ enabled: false, ...config }),
+      new AnthropicInstrumentation({ ...config, enabled: false }),
+      new OpenAIInstrumentation({ ...config, enabled: false }),
     ]);
     return true;
   } catch (error) {

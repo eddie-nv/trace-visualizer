@@ -8,7 +8,11 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ATTR, instrumentFetch, uninstrumentFetch } from "@agentgraph/core";
-import { manuallyInstrument, uninstrumentModule } from "./manually-instrument.js";
+import {
+  manuallyInstrument,
+  resetManualInstrumentationWarnings,
+  uninstrumentModule,
+} from "./manually-instrument.js";
 
 const exporter = new InMemorySpanExporter();
 const realFetch = globalThis.fetch;
@@ -190,6 +194,7 @@ afterEach(() => {
   uninstrumentFetch();
   globalThis.fetch = realFetch;
   exporter.reset();
+  resetManualInstrumentationWarnings();
   vi.restoreAllMocks();
 });
 

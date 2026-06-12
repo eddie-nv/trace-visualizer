@@ -28,7 +28,10 @@ export type InstrumentedProvider = "anthropic" | "openai";
 type AnyFn = (this: unknown, ...args: unknown[]) => unknown;
 type Indexable = Record<PropertyKey, unknown>;
 
-/** The wrapper carries its original here — the idempotency and unwrap handle. */
+/** The wrapper carries its original here — the idempotency and unwrap handle.
+ * `Symbol.for` is deliberate: if two copies of core end up in one process,
+ * sharing the registry key means the second copy skips re-wrapping instead of
+ * double-instrumenting (one span beats two; the skip is the safer failure). */
 const ORIGINAL_KEY = Symbol.for("agentgraph.original-create");
 
 const WARN_PREFIX = "[agentgraph]";
@@ -78,8 +81,14 @@ export function uninstrumentModule(provider: InstrumentedProvider, module: unkno
     if (holder !== undefined && typeof original === "function") {
       holder["create"] = original;
     }
-  } catch {
-    // Unwrapping a module we never touched (or a hostile shape) is a no-op.
+  } catch (error) {
+    // A module we never touched unwraps as a no-op above; reaching here means
+    // the module resisted inspection (e.g. throwing getter) and our wrapper
+    // may still be installed — that must not be invisible.
+    warnOnce(
+      `unwrap:${provider}`,
+      `failed to un-instrument the ${provider} SDK (${error instanceof Error ? error.message : String(error)})`,
+    );
   }
 }
 
@@ -153,8 +162,8 @@ function createWrappedCreate(
       observation = { span, sendContent };
     } catch {
       warnOnce(
-        "span-setup",
-        "failed to start an LLM span; instrumented SDK calls are not being traced",
+        `span-setup:${adapter.providerName}`,
+        `failed to start an LLM span; instrumented ${adapter.providerName} SDK calls are not being traced`,
       );
       observation = undefined;
     }
@@ -202,9 +211,16 @@ function observeResult(
       span.end();
     },
   );
-  // Our derived promise must never surface as an unhandled rejection.
+  // Our derived promise must never surface as an unhandled rejection — but a
+  // rejection HERE means our own observation code threw past its guards, and
+  // that must not be invisible either.
   if (isThenable(tapped)) {
-    void tapped.then(undefined, () => {});
+    void tapped.then(undefined, (error: unknown) => {
+      warnOnce(
+        "tap-rejection",
+        `response observation failed unexpectedly (${error instanceof Error ? error.message : String(error)})`,
+      );
+    });
   }
 }
 
