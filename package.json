@@ -19,6 +19,7 @@
     "jaeger:up": "docker compose up -d jaeger",
     "jaeger:down": "docker compose down",
     "smoke:runtime": "node scripts/runtime-smoke.ts",
+    "smoke:register": "node scripts/register-smoke.ts",
     "smoke:jaeger": "node scripts/jaeger-smoke.ts"
   },
   "devDependencies": {

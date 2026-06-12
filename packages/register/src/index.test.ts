@@ -27,8 +27,9 @@ describe("@agentgraph/register", () => {
     await import("@agentgraph/register");
     vi.resetModules();
 
-    // Act
+    // Act — resetModules keeps the mock registry, so drop the earlier call first
     const freshSdk = await import("@agentgraph/sdk");
+    vi.mocked(freshSdk.init).mockClear();
     await import("@agentgraph/register");
 
     // Assert
