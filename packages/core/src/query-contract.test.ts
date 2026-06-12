@@ -81,9 +81,9 @@ describe("provider (DESIGN §2.3 — the single documented coalesce)", () => {
   });
 
   it("prefers provider.name when both are present", () => {
-    expect(
-      provider({ "gen_ai.provider.name": "anthropic", "gen_ai.system": "legacy" }),
-    ).toBe("anthropic");
+    expect(provider({ "gen_ai.provider.name": "anthropic", "gen_ai.system": "legacy" })).toBe(
+      "anthropic",
+    );
   });
 
   it("returns undefined when neither is a non-empty string", () => {
