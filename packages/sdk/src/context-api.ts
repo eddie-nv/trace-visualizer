@@ -28,11 +28,12 @@ export interface WithAgentOptions {
  * is stamped with `agentgraph.*` by the onStart processor. For async
  * callbacks the agent span ends when the returned promise settles; errors
  * mark the span ERROR and rethrow.
+ *
+ * The overloads assume `fn` is uniformly sync or uniformly async — a union
+ * return type (`Promise<X> | Y`) resolves to the async overload and infers a
+ * surprising nested type.
  */
-export function withAgent<T>(
-  opts: string | WithAgentOptions,
-  fn: () => Promise<T>,
-): Promise<T>;
+export function withAgent<T>(opts: string | WithAgentOptions, fn: () => Promise<T>): Promise<T>;
 export function withAgent<T>(opts: string | WithAgentOptions, fn: () => T): T;
 export function withAgent<T>(opts: string | WithAgentOptions, fn: () => T): T {
   const options = typeof opts === "string" ? { agentId: opts } : opts;
@@ -68,26 +69,38 @@ function contextWithKeys(options: WithAgentOptions): Context {
     : withConv.setValue(CHANNEL_TYPE_KEY, options.channelType);
 }
 
-/** End `span` when `fn` completes — after settlement for thenable results. */
+/**
+ * End `span` when `fn` completes — after settlement for native promises.
+ * Non-Promise thenables are treated as plain sync values (the span ends
+ * immediately). The settled flag guards against a double end if a
+ * misbehaving promise invokes callbacks synchronously.
+ */
 function endSpanAround<T>(span: Span, fn: () => T): T {
+  let isSettled = false;
+  const settleOnce = (end: () => void): void => {
+    if (!isSettled) {
+      isSettled = true;
+      end();
+    }
+  };
   try {
     const result = fn();
-    if (isThenable(result)) {
+    if (result instanceof Promise) {
       return result.then(
-        (value) => {
-          span.end();
+        (value: unknown) => {
+          settleOnce(() => span.end());
           return value;
         },
         (error: unknown) => {
-          failSpan(span, error);
+          settleOnce(() => failSpan(span, error));
           throw error;
         },
       ) as T;
     }
-    span.end();
+    settleOnce(() => span.end());
     return result;
   } catch (error) {
-    failSpan(span, error);
+    settleOnce(() => failSpan(span, error));
     throw error;
   }
 }
@@ -97,12 +110,4 @@ function failSpan(span: Span, error: unknown): void {
   span.recordException(exception);
   span.setStatus({ code: SpanStatusCode.ERROR, message: exception.message });
   span.end();
-}
-
-function isThenable(value: unknown): value is Promise<unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { then?: unknown }).then === "function"
-  );
 }

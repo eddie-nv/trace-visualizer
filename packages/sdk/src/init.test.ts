@@ -104,7 +104,8 @@ describe("init", () => {
     // Act
     emitSpan();
 
-    // Assert — the additive processor exports the same stamped span
+    // Assert — the provider fans out to both processors; the stamping
+    // processor's onStart ran first, so the additive one sees the attrs
     const spans = extra.getFinishedSpans();
     expect(spans).toHaveLength(1);
     expect(spans[0]?.attributes[ATTR.AGENT_ID]).toBe("billing-bot");

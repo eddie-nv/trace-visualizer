@@ -10,6 +10,10 @@ export interface EnvOptions {
   traceContent?: boolean;
   disableBatch?: boolean;
   agentId?: string;
+  /**
+   * Reserved: consumed by the `@agentgraph/register` preload (M4) to opt
+   * into tier-3 module hooks (wired in M6). `init()` deliberately ignores it.
+   */
   instrumentSdks?: boolean;
 }
 
@@ -33,11 +37,19 @@ export function readEnvOptions(env: EnvSource = process.env): EnvOptions {
   };
 }
 
+/** RFC 9110 token chars — anything else in a key risks header injection. */
+const VALID_HEADER_KEY = /^[\w!#$%&'*+.^`|~-]+$/;
+
+/** Control chars (incl. CR/LF and NUL) — Node's http layer rejects these with errors that echo the value. */
+const HAS_CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
+
 /**
  * Parse the `k=v,k2=v2` header format (`AGENTGRAPH_HEADERS`, OTLP convention).
- * Values may contain `=` (split on the first one). Malformed entries are
- * dropped with a warning that never echoes the entry — headers may carry
- * auth tokens.
+ * Values may contain `=` (split on the first one). Malformed entries —
+ * missing `=`, non-token key, control chars anywhere — are dropped with a
+ * warning that never echoes the entry: headers may carry auth tokens, and
+ * forwarding a bad entry would let Node's http layer echo it in its own
+ * error message.
  */
 export function parseHeaders(raw: string): Record<string, string> {
   const pairs = raw
@@ -52,11 +64,12 @@ export function parseHeaders(raw: string): Record<string, string> {
 function parseHeaderEntry(entry: string): [string, string] | undefined {
   const separator = entry.indexOf("=");
   const key = separator === -1 ? "" : entry.slice(0, separator).trim();
-  if (key === "") {
+  const value = separator === -1 ? "" : entry.slice(separator + 1).trim();
+  if (!VALID_HEADER_KEY.test(key) || HAS_CONTROL_CHARS.test(value)) {
     console.warn(
       'agentgraph: ignoring malformed AGENTGRAPH_HEADERS entry (expected "key=value"; entry not shown in case it contains a secret)',
     );
     return undefined;
   }
-  return [key, entry.slice(separator + 1).trim()];
+  return [key, value];
 }

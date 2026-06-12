@@ -14,7 +14,6 @@ import { StampingSpanProcessor } from "./stamping-processor.js";
 
 interface SdkState {
   provider: BasicTracerProvider;
-  contextManager: AsyncLocalStorageContextManager;
   isFetchInstrumented: boolean;
 }
 
@@ -44,12 +43,20 @@ export function init(options?: InitOptions): void {
   if (config.instrumentFetch) {
     instrumentFetch({ traceContent: config.traceContent });
   }
-  const provider = createProvider(config);
-  const contextManager = new AsyncLocalStorageContextManager();
-  contextManager.enable();
-  context.setGlobalContextManager(contextManager);
-  trace.setGlobalTracerProvider(provider);
-  state = { provider, contextManager, isFetchInstrumented: config.instrumentFetch };
+  try {
+    const provider = createProvider(config);
+    const contextManager = new AsyncLocalStorageContextManager();
+    contextManager.enable();
+    context.setGlobalContextManager(contextManager);
+    trace.setGlobalTracerProvider(provider);
+    state = { provider, isFetchInstrumented: config.instrumentFetch };
+  } catch (error) {
+    // don't leave the fetch hook installed with no state to uninstall it from
+    if (config.instrumentFetch) {
+      uninstrumentFetch();
+    }
+    throw error;
+  }
 }
 
 /** Flush all pending spans. Warns and resolves when called before `init()`. */
@@ -80,8 +87,7 @@ export async function shutdown(): Promise<void> {
     await active.provider.shutdown();
   } finally {
     trace.disable();
-    context.disable();
-    active.contextManager.disable();
+    context.disable(); // also disables the registered ALS context manager
   }
 }
 
@@ -96,8 +102,7 @@ function createProvider(config: ResolvedConfig): BasicTracerProvider {
     ? new SimpleSpanProcessor(exporter)
     : new BatchSpanProcessor(exporter);
   const stamping = new StampingSpanProcessor(inner, { agentId: config.agentId });
-  const spanProcessors =
-    config.processor === undefined ? [stamping] : [stamping, config.processor];
+  const spanProcessors = config.processor === undefined ? [stamping] : [stamping, config.processor];
   return new BasicTracerProvider({
     resource: defaultResource().merge(
       resourceFromAttributes({ "service.name": config.serviceName }),

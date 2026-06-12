@@ -41,6 +41,27 @@ describe("parseHeaders", () => {
   it("returns an empty record for an empty string", () => {
     expect(parseHeaders("")).toEqual({});
   });
+
+  it("rejects keys that are not valid HTTP tokens (header injection)", () => {
+    // Arrange
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Act — embedded CRLF would smuggle an extra header through Node's http layer
+    const headers = parseHeaders("x-tenant\r\nx-injected: evil=v,ok=1");
+
+    // Assert
+    expect(headers).toEqual({ ok: "1" });
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("rejects values containing control characters (NUL, CR, LF)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const headers = parseHeaders("bad=v\u0000alue,ok=1");
+
+    expect(headers).toEqual({ ok: "1" });
+    expect(warn).toHaveBeenCalled();
+  });
 });
 
 describe("readEnvOptions", () => {

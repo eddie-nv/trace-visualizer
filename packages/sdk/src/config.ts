@@ -65,12 +65,19 @@ export function resolveConfig(
   };
 }
 
+/** Cap on how much of a bad endpoint is echoed — a mistakenly pasted secret shouldn't land whole in log aggregators. */
+const MAX_ENDPOINT_ECHO_LENGTH = 200;
+
 function validateEndpoint(endpoint: string): void {
   try {
     new URL(endpoint);
   } catch {
+    const display =
+      endpoint.length > MAX_ENDPOINT_ECHO_LENGTH
+        ? `${endpoint.slice(0, MAX_ENDPOINT_ECHO_LENGTH)}…`
+        : endpoint;
     throw new Error(
-      `agentgraph: invalid endpoint "${endpoint}" — expected a URL like ${DEFAULT_ENDPOINT}`,
+      `agentgraph: invalid endpoint "${display}" — expected a URL like ${DEFAULT_ENDPOINT}`,
     );
   }
 }
