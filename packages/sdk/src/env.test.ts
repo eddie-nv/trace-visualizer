@@ -107,3 +107,62 @@ describe("readEnvOptions", () => {
     expect(readEnvOptions({ AGENTGRAPH_INSTRUMENT_SDKS: "yes" })).toEqual({});
   });
 });
+
+describe("AGENTGRAPH_TEST_MATCH_ORIGIN", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is absent when the env var is unset", () => {
+    expect(readEnvOptions({})).not.toHaveProperty("testMatchOrigins");
+  });
+
+  it("parses provider=origin into a record", () => {
+    const options = readEnvOptions({
+      AGENTGRAPH_TEST_MATCH_ORIGIN: "anthropic=http://127.0.0.1:8788",
+    });
+
+    expect(options.testMatchOrigins).toEqual({ anthropic: "http://127.0.0.1:8788" });
+  });
+
+  it("parses multiple comma-separated entries", () => {
+    const options = readEnvOptions({
+      AGENTGRAPH_TEST_MATCH_ORIGIN: "anthropic=http://127.0.0.1:8788,openai=http://127.0.0.1:8789",
+    });
+
+    expect(options.testMatchOrigins).toEqual({
+      anthropic: "http://127.0.0.1:8788",
+      openai: "http://127.0.0.1:8789",
+    });
+  });
+
+  it("normalizes values to their URL origin", () => {
+    const options = readEnvOptions({
+      AGENTGRAPH_TEST_MATCH_ORIGIN: "anthropic=http://127.0.0.1:8788/extra/path",
+    });
+
+    expect(options.testMatchOrigins).toEqual({ anthropic: "http://127.0.0.1:8788" });
+  });
+
+  it("drops malformed entries with a warning and keeps valid ones", () => {
+    // Arrange
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Act — missing "=", unparseable URL
+    const options = readEnvOptions({
+      AGENTGRAPH_TEST_MATCH_ORIGIN: "noequals,anthropic=not a url,openai=http://127.0.0.1:8789",
+    });
+
+    // Assert
+    expect(options.testMatchOrigins).toEqual({ openai: "http://127.0.0.1:8789" });
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("omits the field entirely when every entry is malformed", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const options = readEnvOptions({ AGENTGRAPH_TEST_MATCH_ORIGIN: "garbage" });
+
+    expect(options).not.toHaveProperty("testMatchOrigins");
+  });
+});
