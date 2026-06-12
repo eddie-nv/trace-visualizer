@@ -42,7 +42,12 @@ export function init(options?: InitOptions): void {
   const config = resolveConfig(options);
   try {
     if (config.instrumentFetch) {
-      instrumentFetch({ traceContent: config.traceContent });
+      instrumentFetch({
+        traceContent: config.traceContent,
+        ...(config.testMatchOrigins !== undefined && {
+          testMatchOrigins: config.testMatchOrigins,
+        }),
+      });
     }
     const provider = createProvider(config);
     const contextManager = new AsyncLocalStorageContextManager();

@@ -38,6 +38,9 @@ export interface ResolvedConfig {
   disableBatch: boolean;
   traceContent: boolean | undefined;
   instrumentFetch: boolean;
+  /** TEST-ONLY, env-only (`AGENTGRAPH_TEST_MATCH_ORIGIN`) — deliberately
+   * absent from {@link InitOptions} so it cannot creep into app code. */
+  testMatchOrigins: Record<string, string> | undefined;
 }
 
 /**
@@ -52,6 +55,11 @@ export function resolveConfig(
   const fromEnv = readEnvOptions(env);
   const endpoint = options.endpoint ?? fromEnv.endpoint ?? DEFAULT_ENDPOINT;
   validateEndpoint(endpoint);
+  if (fromEnv.testMatchOrigins !== undefined) {
+    console.warn(
+      "agentgraph: AGENTGRAPH_TEST_MATCH_ORIGIN is set — provider matching is widened for testing; never use this in production",
+    );
+  }
   return {
     agentId: normalizeAgentId(options.agentId ?? fromEnv.agentId),
     serviceName: options.serviceName ?? env["npm_package_name"] ?? DEFAULT_SERVICE_NAME,
@@ -62,6 +70,7 @@ export function resolveConfig(
     disableBatch: options.disableBatch ?? fromEnv.disableBatch ?? false,
     traceContent: options.traceContent ?? fromEnv.traceContent,
     instrumentFetch: options.instrumentFetch ?? true,
+    testMatchOrigins: fromEnv.testMatchOrigins,
   };
 }
 
