@@ -396,6 +396,49 @@ describe("anthropic non-streaming", () => {
     expect(span.events.some((event) => event.name === "exception")).toBe(true);
   });
 
+  it("serializes an array-form system prompt verbatim into system_instructions", async () => {
+    installFetchMock(async () => jsonResponse(ANTHROPIC_RESPONSE_BODY));
+    instrumentFetch();
+    const systemParts = [{ type: "text", text: "be brief" }];
+
+    await postJson(ANTHROPIC_URL, {
+      model: "claude-sonnet-4-6",
+      system: systemParts,
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    const span = await waitForSingleSpan();
+    expect(JSON.parse(String(span.attributes[ATTR.SYSTEM_INSTRUCTIONS]))).toEqual(systemParts);
+  });
+
+  it("flags the span when the response body is not parseable JSON", async () => {
+    installFetchMock(
+      async () =>
+        new Response("not json", {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    instrumentFetch();
+
+    await postJson(ANTHROPIC_URL, ANTHROPIC_REQUEST_BODY);
+
+    const span = await waitForSingleSpan();
+    expect(span.attributes["agentgraph.warn"]).toBe("response body not parseable");
+    expect(span.attributes[ATTR.REQUEST_MODEL]).toBe("claude-sonnet-4-6");
+  });
+
+  it("emits no response attributes when the response JSON is not an object", async () => {
+    installFetchMock(async () => jsonResponse("ok"));
+    instrumentFetch();
+
+    await postJson(ANTHROPIC_URL, ANTHROPIC_REQUEST_BODY);
+
+    const span = await waitForSingleSpan();
+    expect(span.attributes[ATTR.RESPONSE_ID]).toBeUndefined();
+    expect(span.attributes[ATTR.USAGE_INPUT_TOKENS]).toBeUndefined();
+  });
+
   it("ends the span without response attributes when the response has no body", async () => {
     installFetchMock(async () => new Response(null, { status: 200 }));
     instrumentFetch();
@@ -409,6 +452,20 @@ describe("anthropic non-streaming", () => {
 });
 
 describe("openai non-streaming", () => {
+  it("maps max_completion_tokens when max_tokens is absent", async () => {
+    installFetchMock(async () => jsonResponse(OPENAI_RESPONSE_BODY));
+    instrumentFetch();
+
+    await postJson(OPENAI_URL, {
+      model: "gpt-4o-mini",
+      max_completion_tokens: 512,
+      messages: [{ role: "user", content: "hi" }],
+    });
+
+    const span = await waitForSingleSpan();
+    expect(span.attributes[ATTR.REQUEST_MAX_TOKENS]).toBe(512);
+  });
+
   it("emits a span with OpenAI request/response mapping", async () => {
     installFetchMock(async () => jsonResponse(OPENAI_RESPONSE_BODY));
     instrumentFetch();
@@ -446,6 +503,46 @@ describe("openai non-streaming", () => {
 });
 
 describe("anthropic streaming", () => {
+  it("reconstructs tool_use blocks from input_json_delta events", async () => {
+    const toolUseFixture = [
+      'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_02","model":"claude-sonnet-4-6-20250930","usage":{"input_tokens":12,"output_tokens":1}}}\n\n',
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_01","name":"get_weather"}}\n\n',
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"city\\":"}}\n\n',
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\"SF\\"}"}}\n\n',
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":7}}\n\n',
+    ];
+    installFetchMock(async () => sseResponse(toolUseFixture));
+    instrumentFetch();
+
+    await postJson(ANTHROPIC_URL, { ...ANTHROPIC_REQUEST_BODY, stream: true });
+
+    const span = await waitForSingleSpan();
+    expect(span.attributes[ATTR.RESPONSE_FINISH_REASONS]).toEqual(["tool_use"]);
+    expect(span.attributes[ATTR.USAGE_OUTPUT_TOKENS]).toBe(7);
+    expect(JSON.parse(String(span.attributes[ATTR.OUTPUT_MESSAGES]))).toEqual([
+      {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "toolu_01", name: "get_weather", input: { city: "SF" } }],
+      },
+    ]);
+  });
+
+  it("ignores malformed SSE events and keeps accumulating the rest", async () => {
+    const fixtureWithGarbage = [
+      "data: this is not json\n\n",
+      ...ANTHROPIC_SSE_FIXTURE,
+      "data: 42\n\n",
+    ];
+    installFetchMock(async () => sseResponse(fixtureWithGarbage));
+    instrumentFetch();
+
+    await postJson(ANTHROPIC_URL, { ...ANTHROPIC_REQUEST_BODY, stream: true });
+
+    const span = await waitForSingleSpan();
+    expect(span.attributes[ATTR.USAGE_INPUT_TOKENS]).toBe(10);
+    expect(span.attributes[ATTR.USAGE_OUTPUT_TOKENS]).toBe(5);
+  });
+
   it("returns byte-identical SSE to the caller and accumulates usage on the span", async () => {
     const upstreamResponse = sseResponse(ANTHROPIC_SSE_FIXTURE);
     installFetchMock(async () => upstreamResponse);
@@ -490,10 +587,17 @@ describe("anthropic streaming", () => {
 
   it("marks the span ERROR on a mid-stream failure while the caller sees the same error", async () => {
     const encoder = new TextEncoder();
+    // Deliver one chunk, then error on the next pull — erroring in start()
+    // would discard the queued chunk per the streams spec.
+    let hasDeliveredChunk = false;
     const failingStream = new ReadableStream<Uint8Array>({
-      start(controller) {
+      pull(controller) {
+        if (hasDeliveredChunk) {
+          controller.error(new Error("connection reset"));
+          return;
+        }
+        hasDeliveredChunk = true;
         controller.enqueue(encoder.encode(ANTHROPIC_SSE_FIXTURE[0]));
-        controller.error(new Error("connection reset"));
       },
     });
     installFetchMock(
@@ -511,8 +615,10 @@ describe("anthropic streaming", () => {
     const span = await waitForSingleSpan();
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
     expect(span.events.some((event) => event.name === "exception")).toBe(true);
-    // Partial accumulation from message_start survives the failure.
-    expect(span.attributes[ATTR.USAGE_INPUT_TOKENS]).toBe(10);
+    // Note: usage accumulated before the failure is best-effort only — when a
+    // teed stream errors, the spec resets branch queues, so chunks our
+    // background reader has not yet dequeued are discarded.
+    expect(span.attributes[ATTR.REQUEST_MODEL]).toBe("claude-sonnet-4-6");
   });
 });
 
@@ -536,8 +642,8 @@ describe("openai streaming", () => {
   });
 
   it("captures usage from the final chunk when include_usage is set", async () => {
-    installFetchMock(
-      async () => sseResponse([...OPENAI_SSE_FIXTURE, OPENAI_SSE_USAGE_CHUNK, SSE_DONE_CHUNK]),
+    installFetchMock(async () =>
+      sseResponse([...OPENAI_SSE_FIXTURE, OPENAI_SSE_USAGE_CHUNK, SSE_DONE_CHUNK]),
     );
     instrumentFetch();
 

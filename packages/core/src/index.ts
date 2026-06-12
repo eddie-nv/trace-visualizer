@@ -9,6 +9,8 @@ export { TRACER_NAME } from "./tracer.js";
 export { ATTR, CONTENT_ATTRIBUTES, type ContentAttributeKey } from "./attributes.js";
 export { ALLOW_TRACE_CONTENT_KEY, shouldSendContent, type CoreConfig } from "./content-gating.js";
 export { computeAgentFingerprint, type FingerprintInput } from "./fingerprint.js";
+export { instrumentFetch, uninstrumentFetch } from "./fetch-hook.js";
+export { SUPPRESS_FETCH_SPAN_KEY } from "./suppression.js";
 export {
   withLLMCall,
   type LLMCallAttributes,

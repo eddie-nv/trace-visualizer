@@ -23,7 +23,9 @@ async function collectEvents(chunks: readonly string[]): Promise<SseEvent[]> {
 
 describe("parseSseStream", () => {
   it("parses a single event with event and data fields", async () => {
-    const events = await collectEvents(['event: message_start\ndata: {"type":"message_start"}\n\n']);
+    const events = await collectEvents([
+      'event: message_start\ndata: {"type":"message_start"}\n\n',
+    ]);
 
     expect(events).toEqual([{ event: "message_start", data: '{"type":"message_start"}' }]);
   });
@@ -42,7 +44,11 @@ describe("parseSseStream", () => {
 
   it("reassembles events split across arbitrary chunk boundaries", async () => {
     // Split mid-field-name and mid-separator to exercise buffering.
-    const events = await collectEvents(["event: messa", "ge_delta\ndata: payload\n", "\ndata: tail\n\n"]);
+    const events = await collectEvents([
+      "event: messa",
+      "ge_delta\ndata: payload\n",
+      "\ndata: tail\n\n",
+    ]);
 
     expect(events).toEqual([{ event: "message_delta", data: "payload" }, { data: "tail" }]);
   });
