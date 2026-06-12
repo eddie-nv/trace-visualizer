@@ -10,7 +10,7 @@
     "test-apps/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspaces --if-present",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

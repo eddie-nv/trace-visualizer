@@ -1,0 +1,158 @@
+/**
+ * Test B — bare-app verification harness (DESIGN §6, M5). Runs the zero-OTel
+ * bare app in six legs (runtime × preload × content toggle × one-line tier)
+ * against a deterministic local Anthropic mock, then asserts the five pass
+ * criteria via the Jaeger query API:
+ *
+ *   1. span attributes on both endpoints
+ *   2. streaming usage == non-streaming usage
+ *   3. AGENTGRAPH_TRACE_CONTENT=false removes exactly the content attrs
+ *   4. responses byte-identical with/without the preload (Node AND Bun)
+ *   5. Bun leg green — the empirical answer to Q1/Q2
+ *
+ * Requires `npm run build` (preload resolves @agentgraph/register/dist) and a
+ * reachable Jaeger (`npm run jaeger:up`). Runs the Node legs and the Bun legs
+ * from one entry: `npm run test:b`.
+ */
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import {
+  assertAgentId,
+  assertByteIdentity,
+  assertContentRemoved,
+  assertSpanAttributes,
+  assertUsageParity,
+  type Evidence,
+} from "./criteria.ts";
+import { isJaegerReachable, JAEGER_QUERY_URL } from "./jaeger.ts";
+import { startMockAnthropic } from "./mock-anthropic.ts";
+import { runLeg, type LegResult } from "./server-leg.ts";
+
+const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const REGISTER_DIST = fileURLToPath(
+  new URL("../../packages/register/dist/index.js", import.meta.url),
+);
+const BASE_PORT = 18791;
+const ONE_LINE_AGENT_ID = "test-agent";
+const CONTEXT_PROBE = "scripts/test-b/q1-context-probe.ts";
+
+/** Q1's second half: context.with across async boundaries, per runtime. */
+function runContextProbe(runtime: "node" | "bun"): Evidence {
+  const command = runtime === "bun" ? "bun" : process.execPath;
+  const cleanEnv = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key, value]) => value !== undefined && !key.startsWith("AGENTGRAPH_"),
+    ),
+  ) as Record<string, string>;
+  const result = spawnSync(command, [CONTEXT_PROBE], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    env: cleanEnv,
+  });
+  if (result.status !== 0) {
+    throw new Error(`q1 context probe failed under ${runtime}:\n${result.stderr}`);
+  }
+  return { criterion: `Q1 context propagation (${runtime})`, detail: result.stdout.trim() };
+}
+
+async function preflight(): Promise<void> {
+  if (!existsSync(REGISTER_DIST)) {
+    throw new Error("packages/register/dist is missing — run `npm run build` first");
+  }
+  if (spawnSync("bun", ["--version"], { encoding: "utf8" }).status !== 0) {
+    throw new Error("bun is not on PATH — the Bun leg (criterion 5, Q1/Q2) is mandatory");
+  }
+  if (!(await isJaegerReachable())) {
+    throw new Error(`Jaeger not reachable at ${JAEGER_QUERY_URL} — run \`npm run jaeger:up\``);
+  }
+}
+
+function printReport(evidence: readonly Evidence[]): void {
+  console.log("\nTest B verification (DESIGN §6) — evidence:");
+  for (const item of evidence) {
+    console.log(`  PASS ${item.criterion} — ${item.detail}`);
+  }
+}
+
+async function main(): Promise<void> {
+  await preflight();
+  const mock = await startMockAnthropic();
+  const runId = Date.now().toString(36);
+  try {
+    const leg = (
+      label: string,
+      overrides: Partial<Parameters<typeof runLeg>[0]>,
+      portOffset: number,
+    ): Promise<LegResult> =>
+      runLeg({
+        label,
+        runtime: "node",
+        port: BASE_PORT + portOffset,
+        mockOrigin: mock.origin,
+        ...overrides,
+      });
+
+    console.log("Test B: running 6 legs against mock at", mock.origin);
+    const nodeBaseline = await leg("node-baseline", {}, 0);
+    const nodePreload = await leg(
+      "node-preload",
+      { preload: true, serviceName: `tb-node-${runId}` },
+      1,
+    );
+    const nodeContentOff = await leg(
+      "node-content-off",
+      {
+        preload: true,
+        serviceName: `tb-nocontent-${runId}`,
+        extraEnv: { AGENTGRAPH_TRACE_CONTENT: "false" },
+      },
+      2,
+    );
+    const bunBaseline = await leg("bun-baseline", { runtime: "bun" }, 3);
+    const bunPreload = await leg(
+      "bun-preload",
+      { runtime: "bun", preload: true, serviceName: `tb-bun-${runId}` },
+      4,
+    );
+    const oneLine = await leg(
+      "node-one-line",
+      { entry: "server-one-line.ts", serviceName: `tb-oneline-${runId}` },
+      5,
+    );
+
+    const evidence: Evidence[] = [];
+    evidence.push(assertSpanAttributes(nodePreload));
+    evidence.push(assertUsageParity(nodePreload));
+    evidence.push(assertContentRemoved(nodeContentOff));
+    evidence.push(assertByteIdentity(nodeBaseline, nodePreload));
+    // Criterion 5: the same attribute + parity + byte gates, on Bun. Green
+    // means the fetch hook, ALS context manager, and OTLP proto exporter all
+    // work under Bun (Q1) and the SDK's requests hit globalThis.fetch (Q2).
+    assertSpanAttributes(bunPreload);
+    assertUsageParity(bunPreload);
+    evidence.push({
+      criterion: "5: Bun leg (answers Q1/Q2)",
+      detail: `bun-preload: spans exported and attribute-complete under Bun ${bunVersion()}`,
+    });
+    evidence.push(assertByteIdentity(bunBaseline, bunPreload));
+    evidence.push(assertSpanAttributes(oneLine));
+    evidence.push(assertAgentId(oneLine, ONE_LINE_AGENT_ID));
+    evidence.push(runContextProbe("node"));
+    evidence.push(runContextProbe("bun"));
+
+    printReport(evidence);
+    console.log("\nTest B PASS: all 5 criteria green on Node and Bun");
+  } finally {
+    await mock.close();
+  }
+}
+
+function bunVersion(): string {
+  return spawnSync("bun", ["--version"], { encoding: "utf8" }).stdout.trim();
+}
+
+main().catch((error: unknown) => {
+  console.error(`\nTest B FAIL: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+});
