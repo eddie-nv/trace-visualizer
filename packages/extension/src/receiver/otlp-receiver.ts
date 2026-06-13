@@ -109,6 +109,6 @@ async function forwardToJaeger(jaegerEndpoint: string, body: Buffer): Promise<vo
   await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: body as unknown as BodyInit,
+    body: body.toString("utf8"),
   });
 }

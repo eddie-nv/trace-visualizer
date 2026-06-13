@@ -26,13 +26,6 @@ export function renderFragments(
     const minY = Math.min(...memberRows.map((r) => r.y)) - FRAGMENT_PADDING;
     const maxY = Math.max(...memberRows.map((r) => r.y + r.height)) + FRAGMENT_PADDING;
 
-    const participantIds = fragment.memberSpanIds
-      .flatMap((spanId) => {
-        const reqId = `${spanId}-req`;
-        // collect participant ids mentioned in arrows for this span
-        return [];
-      });
-
     const allX = [...columns.values()].map((c) => c.x);
     const minX = allX.length > 0 ? Math.min(...allX) - columns.values().next().value!.width / 2 - FRAGMENT_PADDING : 0;
     const maxX = allX.length > 0 ? Math.max(...allX) + columns.values().next().value!.width / 2 + FRAGMENT_PADDING : 100;
