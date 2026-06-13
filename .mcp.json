@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agentgraph": {
+      "command": "node",
+      "args": ["packages/extension/dist/mcp.js"]
+    }
+  }
+}

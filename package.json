@@ -23,7 +23,8 @@
     "smoke:register": "node scripts/register-smoke.ts",
     "smoke:jaeger": "node scripts/jaeger-smoke.ts",
     "test:b": "node scripts/test-b/run.ts",
-    "test:ac": "node scripts/test-c/run.ts"
+    "test:ac": "node scripts/test-c/run.ts",
+    "test:f": "node scripts/test-f/run.ts"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
