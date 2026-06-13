@@ -60,27 +60,28 @@ export function createScene(container: HTMLElement): SceneLayers {
   const zoom: ZoomState = { tx: 0, ty: 0, scale: 1 };
 
   function applyZoom(): void {
-    zoomGroup.setAttribute(
-      "transform",
-      `translate(${zoom.tx},${zoom.ty}) scale(${zoom.scale})`,
-    );
+    zoomGroup.setAttribute("transform", `translate(${zoom.tx},${zoom.ty}) scale(${zoom.scale})`);
   }
 
-  svg.addEventListener("wheel", (e: WheelEvent) => {
-    e.preventDefault();
-    const rect = svg.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+  svg.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = svg.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, zoom.scale * zoomFactor));
-    const ratio = newScale / zoom.scale;
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, zoom.scale * zoomFactor));
+      const ratio = newScale / zoom.scale;
 
-    zoom.tx = mouseX - ratio * (mouseX - zoom.tx);
-    zoom.ty = mouseY - ratio * (mouseY - zoom.ty);
-    zoom.scale = newScale;
-    applyZoom();
-  }, { passive: false });
+      zoom.tx = mouseX - ratio * (mouseX - zoom.tx);
+      zoom.ty = mouseY - ratio * (mouseY - zoom.ty);
+      zoom.scale = newScale;
+      applyZoom();
+    },
+    { passive: false },
+  );
 
   let isPanning = false;
   let panStartX = 0;

@@ -10,7 +10,9 @@ function makeEnvelopeBody(traceId: string, spanId: string): string {
         resource: { attributes: [{ key: "service.name", value: { stringValue: "test-svc" } }] },
         scopeSpans: [
           {
-            spans: [{ traceId, spanId, name: "op", startTimeUnixNano: "1000", endTimeUnixNano: "2000" }],
+            spans: [
+              { traceId, spanId, name: "op", startTimeUnixNano: "1000", endTimeUnixNano: "2000" },
+            ],
           },
         ],
       },
@@ -18,14 +20,26 @@ function makeEnvelopeBody(traceId: string, spanId: string): string {
   });
 }
 
-async function postTo(port: number, body: string, contentType = "application/json"): Promise<{ status: number; body: string }> {
+async function postTo(
+  port: number,
+  body: string,
+  contentType = "application/json",
+): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = http.request(
-      { hostname: "127.0.0.1", port, path: "/v1/traces", method: "POST", headers: { "content-type": contentType } },
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: "/v1/traces",
+        method: "POST",
+        headers: { "content-type": contentType },
+      },
       (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (c: Buffer) => chunks.push(c));
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString() }));
+        res.on("end", () =>
+          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString() }),
+        );
       },
     );
     req.on("error", reject);

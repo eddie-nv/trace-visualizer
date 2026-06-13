@@ -14,12 +14,11 @@ export function renderFragments(
   rowMap: ReadonlyMap<string, RowLayout>,
 ): void {
   for (const fragment of fragments) {
-    const memberRows = fragment.memberSpanIds
-      .flatMap((spanId) => {
-        const reqRow = rowMap.get(`${spanId}-req`);
-        const retRow = rowMap.get(`${spanId}-ret`);
-        return [reqRow, retRow].filter((r): r is RowLayout => r !== undefined);
-      });
+    const memberRows = fragment.memberSpanIds.flatMap((spanId) => {
+      const reqRow = rowMap.get(`${spanId}-req`);
+      const retRow = rowMap.get(`${spanId}-ret`);
+      return [reqRow, retRow].filter((r): r is RowLayout => r !== undefined);
+    });
 
     if (memberRows.length === 0) continue;
 
@@ -27,8 +26,14 @@ export function renderFragments(
     const maxY = Math.max(...memberRows.map((r) => r.y + r.height)) + FRAGMENT_PADDING;
 
     const allX = [...columns.values()].map((c) => c.x);
-    const minX = allX.length > 0 ? Math.min(...allX) - columns.values().next().value!.width / 2 - FRAGMENT_PADDING : 0;
-    const maxX = allX.length > 0 ? Math.max(...allX) + columns.values().next().value!.width / 2 + FRAGMENT_PADDING : 100;
+    const minX =
+      allX.length > 0
+        ? Math.min(...allX) - columns.values().next().value!.width / 2 - FRAGMENT_PADDING
+        : 0;
+    const maxX =
+      allX.length > 0
+        ? Math.max(...allX) + columns.values().next().value!.width / 2 + FRAGMENT_PADDING
+        : 100;
 
     if (fragmentElements.has(fragment.id)) {
       const g = fragmentElements.get(fragment.id)!;

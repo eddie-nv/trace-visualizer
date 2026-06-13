@@ -62,11 +62,11 @@ function buildPanelHTML(span: OtlpSpan): string {
 
   const inputTokens = attrs.find((a) => a.key === "gen_ai.usage.input_tokens")?.value?.intValue;
   const outputTokens = attrs.find((a) => a.key === "gen_ai.usage.output_tokens")?.value?.intValue;
-  const finishReasons = attrs.find((a) => a.key === "gen_ai.response.finish_reasons")?.value?.stringValue;
+  const finishReasons = attrs.find((a) => a.key === "gen_ai.response.finish_reasons")?.value
+    ?.stringValue;
   const model = attrs.find((a) => a.key === "gen_ai.request.model")?.value?.stringValue;
 
-  const durationMs =
-    (BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano)) / 1_000_000n;
+  const durationMs = (BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano)) / 1_000_000n;
 
   const openFileBtn =
     file !== undefined && line !== undefined

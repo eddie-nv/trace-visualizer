@@ -59,7 +59,10 @@ export function register(options: RegisterOptions = {}): void {
   }
 }
 
-function warnRegistrationFailure(error: unknown, prefix = "preload registration failed; tracing is disabled"): void {
+function warnRegistrationFailure(
+  error: unknown,
+  prefix = "preload registration failed; tracing is disabled",
+): void {
   const detail = error instanceof Error ? error.message : String(error);
   try {
     // The raw error rides along as a second argument so Node/Bun print the

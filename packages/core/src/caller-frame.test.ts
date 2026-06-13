@@ -15,10 +15,7 @@ function makeStack(...frames: string[]): string {
 describe("captureCallerFrame", () => {
   it("returns the first non-internal named frame from a synthetic V8 stack", () => {
     // Arrange
-    const stack = makeStack(
-      agentgraphLine,
-      "    at myFunction (/proj/src/app.ts:42:5)",
-    );
+    const stack = makeStack(agentgraphLine, "    at myFunction (/proj/src/app.ts:42:5)");
 
     // Act
     const frame = captureCallerFrame(stack);
@@ -47,11 +44,7 @@ describe("captureCallerFrame", () => {
 
   it("skips @opentelemetry frames", () => {
     // Arrange
-    const stack = makeStack(
-      agentgraphLine,
-      otelLine,
-      "    at userCall (/proj/src/index.ts:5:5)",
-    );
+    const stack = makeStack(agentgraphLine, otelLine, "    at userCall (/proj/src/index.ts:5:5)");
 
     // Act
     const frame = captureCallerFrame(stack);
@@ -119,10 +112,7 @@ describe("captureCallerFrame", () => {
 
   it("handles async anonymous frames (async prefix before path)", () => {
     // Arrange
-    const stack = makeStack(
-      agentgraphLine,
-      "    at async /proj/src/routes.ts:55:10",
-    );
+    const stack = makeStack(agentgraphLine, "    at async /proj/src/routes.ts:55:10");
 
     // Act
     const frame = captureCallerFrame(stack);
@@ -138,16 +128,15 @@ describe("captureCallerFrame", () => {
   });
 
   it("returns undefined when stack has no parseable at-frames", () => {
-    expect(captureCallerFrame("Error: something went wrong\n  caused by: bad config")).toBeUndefined();
+    expect(
+      captureCallerFrame("Error: something went wrong\n  caused by: bad config"),
+    ).toBeUndefined();
   });
 
   it("relativizes absolute paths that start with process.cwd()", () => {
     // Arrange — synthetic frame whose path starts with the real project root
     const cwd = process.cwd();
-    const stack = makeStack(
-      agentgraphLine,
-      `    at myFunc (${cwd}/src/app.ts:10:5)`,
-    );
+    const stack = makeStack(agentgraphLine, `    at myFunc (${cwd}/src/app.ts:10:5)`);
 
     // Act
     const frame = captureCallerFrame(stack);

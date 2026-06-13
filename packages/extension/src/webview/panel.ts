@@ -60,13 +60,7 @@ function replayTrace(store: SpanStore, fanout: Fanout): void {
   if (convs.length === 0) return;
   const conv = convs[0];
   if (!conv) return;
-  for (const span of conv.spans) {
-    const svc = [...conv.servicesSeen][0] ?? "unknown";
-    fanout.broadcastSpan(conv.traceId, span, svc);
-  }
-  if (conv.complete) {
-    fanout.broadcastTraceComplete(conv.traceId);
-  }
+  fanout.activateTrace(conv.traceId, conv.spans, conv.complete);
 }
 
 function buildHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {

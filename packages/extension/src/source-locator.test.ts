@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockFindFiles, mockShowTextDocument, mockShowErrorMessage, mockRevealRange } = vi.hoisted(() => ({
-  mockFindFiles: vi.fn(),
-  mockShowTextDocument: vi.fn(),
-  mockShowErrorMessage: vi.fn(),
-  mockRevealRange: vi.fn(),
-}));
+const { mockFindFiles, mockShowTextDocument, mockShowErrorMessage, mockRevealRange } = vi.hoisted(
+  () => ({
+    mockFindFiles: vi.fn(),
+    mockShowTextDocument: vi.fn(),
+    mockShowErrorMessage: vi.fn(),
+    mockRevealRange: vi.fn(),
+  }),
+);
 
 const mockEditor = { revealRange: mockRevealRange };
 

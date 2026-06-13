@@ -32,7 +32,9 @@ export async function openSourceLocation(
 }
 
 async function revealInEditor(uri: vscode.Uri, line: number | undefined): Promise<void> {
-  const editor = await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.Beside });
+  const editor = await vscode.window.showTextDocument(uri, {
+    viewColumn: vscode.ViewColumn.Beside,
+  });
   const lineIndex = Math.max(0, (line ?? 1) - 1);
   const pos = new vscode.Position(lineIndex, 0);
   editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);

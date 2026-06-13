@@ -740,7 +740,7 @@ describe("code location attributes (R6)", () => {
     expect(typeof span.attributes[ATTR.CODE_FILE]).toBe("string");
     expect((span.attributes[ATTR.CODE_FILE] as string).length).toBeGreaterThan(0);
     expect(typeof span.attributes[ATTR.CODE_LINE]).toBe("number");
-    expect((span.attributes[ATTR.CODE_LINE] as number)).toBeGreaterThan(0);
+    expect(span.attributes[ATTR.CODE_LINE] as number).toBeGreaterThan(0);
     expect(span.attributes[ATTR.CODE_FUNCTION]).toBeDefined();
   });
 
