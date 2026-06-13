@@ -54,7 +54,9 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   });
 
-  outputChannel.appendLine(`[AgentGraph] OTLP receiver listening on http://127.0.0.1:${port}/v1/traces`);
+  outputChannel.appendLine(
+    `[AgentGraph] OTLP receiver listening on http://127.0.0.1:${port}/v1/traces`,
+  );
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     const msg =

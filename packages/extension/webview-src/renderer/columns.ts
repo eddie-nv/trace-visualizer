@@ -79,7 +79,8 @@ export function renderFooterColumns(
   totalHeight: number,
 ): void {
   const footerY = totalHeight + ROW_GAP;
-  const footerBottom = footerY + HEADER_BOX_PADDING_TOP + HEADER_BOX_HEIGHT + HEADER_BOX_PADDING_TOP;
+  const footerBottom =
+    footerY + HEADER_BOX_PADDING_TOP + HEADER_BOX_HEIGHT + HEADER_BOX_PADDING_TOP;
 
   for (const participant of participants) {
     const col = columns.get(participant.id);

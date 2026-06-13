@@ -143,7 +143,9 @@ describe("spansToViewModel — fixture A (Test D)", () => {
   it("produces 4 span events on the model participant", () => {
     const vm = spansToViewModel(ALL_ENTRIES);
     expect(vm.spanEvents).toHaveLength(4);
-    expect(vm.spanEvents.every((e) => e.participantId === "anthropic.messages:claude-mock-model")).toBe(true);
+    expect(
+      vm.spanEvents.every((e) => e.participantId === "anthropic.messages:claude-mock-model"),
+    ).toBe(true);
     expect(vm.spanEvents.map((e) => e.name)).toEqual([
       "ai.stream.firstChunk",
       "ai.stream.finish",

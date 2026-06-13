@@ -6,11 +6,16 @@
   "private": true,
   "publisher": "agentgraph",
   "displayName": "AgentGraph",
-  "categories": ["Visualization", "Other"],
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
   "engines": {
     "vscode": "^1.96.0"
   },
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.cjs",
   "contributes": {
     "commands": [
@@ -44,7 +49,10 @@
       }
     }
   },
-  "files": ["dist", "webview-src/app.html"],
+  "files": [
+    "dist",
+    "webview-src/app.html"
+  ],
   "scripts": {
     "build": "npm run build:host && npm run build:webview",
     "build:host": "esbuild src/extension.ts --bundle --sourcemap --platform=node --target=node20 --format=cjs --external:vscode --outfile=dist/extension.cjs",

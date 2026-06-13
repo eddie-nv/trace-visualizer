@@ -40,8 +40,14 @@ describe("SpanStore", () => {
 
   it("appends subsequent spans to the same trace", () => {
     const resource = makeResourceSpan("svc");
-    store.addSpan(resource, makeSpan({ traceId: "t1", spanId: "s1", name: "a", parentSpanId: "p" }));
-    store.addSpan(resource, makeSpan({ traceId: "t1", spanId: "s2", name: "b", parentSpanId: "p" }));
+    store.addSpan(
+      resource,
+      makeSpan({ traceId: "t1", spanId: "s1", name: "a", parentSpanId: "p" }),
+    );
+    store.addSpan(
+      resource,
+      makeSpan({ traceId: "t1", spanId: "s2", name: "b", parentSpanId: "p" }),
+    );
 
     const convs = store.getConversations();
     expect(convs).toHaveLength(1);
@@ -59,7 +65,10 @@ describe("SpanStore", () => {
 
   it("marks trace complete when root span arrives", () => {
     const resource = makeResourceSpan("svc");
-    store.addSpan(resource, makeSpan({ traceId: "t1", spanId: "child", name: "child", parentSpanId: "root" }));
+    store.addSpan(
+      resource,
+      makeSpan({ traceId: "t1", spanId: "child", name: "child", parentSpanId: "root" }),
+    );
     expect(store.getConversations()[0]?.complete).toBe(false);
 
     store.addSpan(resource, makeSpan({ traceId: "t1", spanId: "root", name: "root" }));
@@ -67,8 +76,14 @@ describe("SpanStore", () => {
   });
 
   it("tracks services seen per trace", () => {
-    store.addSpan(makeResourceSpan("svc-a"), makeSpan({ traceId: "t1", spanId: "s1", name: "x", parentSpanId: "r" }));
-    store.addSpan(makeResourceSpan("svc-b"), makeSpan({ traceId: "t1", spanId: "s2", name: "y", parentSpanId: "r" }));
+    store.addSpan(
+      makeResourceSpan("svc-a"),
+      makeSpan({ traceId: "t1", spanId: "s1", name: "x", parentSpanId: "r" }),
+    );
+    store.addSpan(
+      makeResourceSpan("svc-b"),
+      makeSpan({ traceId: "t1", spanId: "s2", name: "y", parentSpanId: "r" }),
+    );
 
     const conv = store.getConversations()[0];
     expect(conv?.servicesSeen.has("svc-a")).toBe(true);

@@ -19,7 +19,8 @@ export class SpanStore {
   private readonly traces = new Map<string, TracedConversation>();
 
   addSpan(resourceSpan: OtlpResourceSpan, span: OtlpSpan): void {
-    const serviceName = getStringAttr(resourceSpan.resource?.attributes, "service.name") ?? "unknown";
+    const serviceName =
+      getStringAttr(resourceSpan.resource?.attributes, "service.name") ?? "unknown";
     const isRoot = !span.parentSpanId;
     const entry: SpanEntry = { span, serviceName };
 

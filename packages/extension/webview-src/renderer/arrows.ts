@@ -99,10 +99,7 @@ export function renderSpanEvents(
     const diamond = document.createElementNS(SVG_NS, "polygon");
     const cx = col.x;
     const r = 5;
-    diamond.setAttribute(
-      "points",
-      `${cx},${y - r} ${cx + r},${y} ${cx},${y + r} ${cx - r},${y}`,
-    );
+    diamond.setAttribute("points", `${cx},${y - r} ${cx + r},${y} ${cx},${y + r} ${cx - r},${y}`);
     diamond.setAttribute("fill", "var(--tv-accent)");
 
     const label = document.createElementNS(SVG_NS, "text");

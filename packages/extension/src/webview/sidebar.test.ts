@@ -16,7 +16,10 @@ function makeConv(overrides: Partial<TracedConversation> = {}): TracedConversati
   };
 }
 
-function makeStore(convs: TracedConversation[] = [], conv?: TracedConversation): Partial<SpanStore> {
+function makeStore(
+  convs: TracedConversation[] = [],
+  conv?: TracedConversation,
+): Partial<SpanStore> {
   return {
     getConversations: vi.fn(() => convs),
     getConversation: vi.fn((id: string) => (conv?.traceId === id ? conv : undefined)),
@@ -37,13 +40,19 @@ function makeWebviewView(postMessage = vi.fn()) {
       return { dispose: vi.fn() };
     }),
     _html: "",
-    get html() { return this._html; },
-    set html(v: string) { this._html = v; },
+    get html() {
+      return this._html;
+    },
+    set html(v: string) {
+      this._html = v;
+    },
   };
   const webviewView = { webview: innerWebview };
   return {
     webviewView,
-    get html() { return innerWebview.html; },
+    get html() {
+      return innerWebview.html;
+    },
     sendMessage: (msg: unknown) => handler?.(msg),
   };
 }
@@ -68,7 +77,12 @@ describe("TraceSidebarProvider", () => {
   });
 
   it("renders trace items when conversations exist", () => {
-    const conv = makeConv({ traceId: "abc123", rootSpan: { name: "my-op" } as never, servicesSeen: new Set(["svc-a", "svc-b"]), complete: true });
+    const conv = makeConv({
+      traceId: "abc123",
+      rootSpan: { name: "my-op" } as never,
+      servicesSeen: new Set(["svc-a", "svc-b"]),
+      complete: true,
+    });
     store = makeStore([conv], conv);
     const provider = new TraceSidebarProvider(store as SpanStore, fanout as Fanout, openDiagram);
     const view = makeWebviewView();
@@ -146,7 +160,7 @@ describe("TraceSidebarProvider", () => {
   });
 
   it("escapes HTML in operation name to prevent XSS", () => {
-    const conv = makeConv({ rootSpan: { name: '<script>alert(1)</script>' } as never });
+    const conv = makeConv({ rootSpan: { name: "<script>alert(1)</script>" } as never });
     store = makeStore([conv], conv);
     const provider = new TraceSidebarProvider(store as SpanStore, fanout as Fanout, openDiagram);
     const view = makeWebviewView();

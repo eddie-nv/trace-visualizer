@@ -9,7 +9,10 @@ export class TraceStore {
   private currentTraceId: string | undefined = undefined;
   private listeners: TraceStoreListener[] = [];
 
-  setActiveTrace(traceId: string, spans: ReadonlyArray<{ span: OtlpSpan; serviceName: string }>): void {
+  setActiveTrace(
+    traceId: string,
+    spans: ReadonlyArray<{ span: OtlpSpan; serviceName: string }>,
+  ): void {
     this.currentTraceId = traceId;
     this.entries = [...spans];
     this.notify();

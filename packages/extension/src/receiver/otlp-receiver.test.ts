@@ -49,7 +49,11 @@ describe("processOtlpBody", () => {
     processOtlpBody(body, "application/json", store, onSpan);
 
     expect(onSpan).toHaveBeenCalledOnce();
-    expect(onSpan).toHaveBeenCalledWith("trace1", expect.objectContaining({ spanId: "span1" }), "my-service");
+    expect(onSpan).toHaveBeenCalledWith(
+      "trace1",
+      expect.objectContaining({ spanId: "span1" }),
+      "my-service",
+    );
   });
 
   it("returns 400 for invalid JSON", () => {
@@ -87,8 +91,21 @@ describe("processOtlpBody", () => {
           scopeSpans: [
             {
               spans: [
-                { traceId: "t1", spanId: "s1", name: "a", startTimeUnixNano: "1", endTimeUnixNano: "2" },
-                { traceId: "t1", spanId: "s2", name: "b", startTimeUnixNano: "1", endTimeUnixNano: "2", parentSpanId: "s1" },
+                {
+                  traceId: "t1",
+                  spanId: "s1",
+                  name: "a",
+                  startTimeUnixNano: "1",
+                  endTimeUnixNano: "2",
+                },
+                {
+                  traceId: "t1",
+                  spanId: "s2",
+                  name: "b",
+                  startTimeUnixNano: "1",
+                  endTimeUnixNano: "2",
+                  parentSpanId: "s1",
+                },
               ],
             },
           ],
@@ -98,7 +115,14 @@ describe("processOtlpBody", () => {
           scopeSpans: [
             {
               spans: [
-                { traceId: "t1", spanId: "s3", name: "c", startTimeUnixNano: "1", endTimeUnixNano: "2", parentSpanId: "s1" },
+                {
+                  traceId: "t1",
+                  spanId: "s3",
+                  name: "c",
+                  startTimeUnixNano: "1",
+                  endTimeUnixNano: "2",
+                  parentSpanId: "s1",
+                },
               ],
             },
           ],
@@ -120,7 +144,13 @@ describe("processOtlpBody", () => {
           scopeSpans: [
             {
               spans: [
-                { traceId: "t1", spanId: "s1", name: "op", startTimeUnixNano: "1", endTimeUnixNano: "2" },
+                {
+                  traceId: "t1",
+                  spanId: "s1",
+                  name: "op",
+                  startTimeUnixNano: "1",
+                  endTimeUnixNano: "2",
+                },
               ],
             },
           ],

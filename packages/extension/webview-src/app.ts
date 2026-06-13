@@ -98,7 +98,12 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
     }
     case "traceComplete": {
       if (lastVm && lastLayout) {
-        renderFooterColumns(scene.lifelines, lastVm.participants, lastLayout.columns, lastLayout.totalHeight);
+        renderFooterColumns(
+          scene.lifelines,
+          lastVm.participants,
+          lastLayout.columns,
+          lastLayout.totalHeight,
+        );
       }
       break;
     }

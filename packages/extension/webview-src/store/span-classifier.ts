@@ -1,5 +1,12 @@
 import type { OtlpSpan } from "../../src/receiver/otlp-types.js";
-import type { Arrow, ActionNode, Fragment, Participant, SpanEvent, ViewModel } from "./view-model.js";
+import type {
+  Arrow,
+  ActionNode,
+  Fragment,
+  Participant,
+  SpanEvent,
+  ViewModel,
+} from "./view-model.js";
 
 export interface SpanEntry {
   readonly span: OtlpSpan;
@@ -53,7 +60,11 @@ function resolveParticipant(span: OtlpSpan, serviceName: string): Participant {
 
   const fingerprint = getStr(span, "agentgraph.agent.fingerprint");
   if (fingerprint !== undefined) {
-    return { id: fingerprint, label: `${serviceName} (${fingerprint.slice(0, 8)})`, type: "cluster" };
+    return {
+      id: fingerprint,
+      label: `${serviceName} (${fingerprint.slice(0, 8)})`,
+      type: "cluster",
+    };
   }
 
   return { id: serviceName, label: serviceName, type: "service" };
@@ -123,9 +134,9 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
         requestLabel = `${toolName}${args}`;
         returnLabel = toolResult ?? "done";
       } else {
-        const roundNum = arrows.filter(
-          (a) => a.style === "solid" && a.toParticipantId === targetParticipant.id,
-        ).length + 1;
+        const roundNum =
+          arrows.filter((a) => a.style === "solid" && a.toParticipantId === targetParticipant.id)
+            .length + 1;
         requestLabel = `chat (round ${roundNum})`;
         const reasons = finishReasons ?? "";
         const usage =

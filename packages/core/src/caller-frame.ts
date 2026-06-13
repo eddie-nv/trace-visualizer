@@ -25,13 +25,13 @@ const ANON_FRAME_RE = /^\s+at (?:async )?(.+):(\d+):\d+$/;
 
 // Frames to skip — covers both production (npm) and dev (source) paths.
 const SKIP_PATTERNS: RegExp[] = [
-  /@agentgraph\//,          // npm install path: node_modules/@agentgraph/core
-  /\/packages\/core\//,     // dev source
-  /\/packages\/sdk\//,      // dev source
+  /@agentgraph\//, // npm install path: node_modules/@agentgraph/core
+  /\/packages\/core\//, // dev source
+  /\/packages\/sdk\//, // dev source
   /\/packages\/register\//, // dev source
-  /@opentelemetry\//,       // OpenTelemetry internals
-  /\(node:/,                // node: built-ins, parenthesised: "at Foo (node:...)"
-  /^\s+at node:/,           // node: built-ins, bare: "at node:events:..."
+  /@opentelemetry\//, // OpenTelemetry internals
+  /\(node:/, // node: built-ins, parenthesised: "at Foo (node:...)"
+  /^\s+at node:/, // node: built-ins, bare: "at node:events:..."
 ];
 
 // Captured once at startup so every invocation avoids a process.cwd() syscall.

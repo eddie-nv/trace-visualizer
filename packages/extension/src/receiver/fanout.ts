@@ -40,11 +40,7 @@ export class Fanout {
   }
 
   /** Switch to a new active trace, clear any buffered messages, and send a full replay. */
-  activateTrace(
-    traceId: string,
-    spans: ReadonlyArray<SpanEntry>,
-    complete: boolean,
-  ): void {
+  activateTrace(traceId: string, spans: ReadonlyArray<SpanEntry>, complete: boolean): void {
     this.activeTraceId = traceId;
     this.buffer = [];
     this.enqueue({ command: "initTrace", traceId, spans: [...spans] });

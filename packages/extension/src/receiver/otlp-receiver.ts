@@ -33,7 +33,8 @@ export function processOtlpBody(
   }
 
   for (const resourceSpan of envelope.resourceSpans ?? []) {
-    const serviceName = getStringAttr(resourceSpan.resource?.attributes, "service.name") ?? "unknown";
+    const serviceName =
+      getStringAttr(resourceSpan.resource?.attributes, "service.name") ?? "unknown";
     for (const scopeSpan of resourceSpan.scopeSpans ?? []) {
       for (const span of scopeSpan.spans ?? []) {
         store.addSpan(resourceSpan, span);

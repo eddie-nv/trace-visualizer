@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildLayout, ARROW_HEIGHT, ACTION_NODE_HEIGHT, ROW_GAP, HEADER_HEIGHT } from "./swimlane.js";
+import {
+  buildLayout,
+  ARROW_HEIGHT,
+  ACTION_NODE_HEIGHT,
+  ROW_GAP,
+  HEADER_HEIGHT,
+} from "./swimlane.js";
 import type { ViewModel } from "../store/view-model.js";
 
 const BASE_VM: ViewModel = {

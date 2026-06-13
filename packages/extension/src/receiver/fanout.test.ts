@@ -49,8 +49,14 @@ describe("Fanout", () => {
     fanout.onWebviewReady();
 
     expect(postMessage).toHaveBeenCalledTimes(2);
-    expect(postMessage).toHaveBeenNthCalledWith(1, expect.objectContaining({ command: "appendSpan", traceId: "t1", span: span1 }));
-    expect(postMessage).toHaveBeenNthCalledWith(2, expect.objectContaining({ command: "appendSpan", traceId: "t1", span: span2 }));
+    expect(postMessage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ command: "appendSpan", traceId: "t1", span: span1 }),
+    );
+    expect(postMessage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ command: "appendSpan", traceId: "t1", span: span2 }),
+    );
   });
 
   it("does not post when no panel is set", () => {
@@ -86,7 +92,9 @@ describe("Fanout", () => {
     fanout.broadcastSpan("t1", makeSpan("s1"), "svc"); // activates t1
     fanout.broadcastTraceComplete("t2"); // t2 not active → dropped
 
-    expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ command: "traceComplete" }));
+    expect(postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: "traceComplete" }),
+    );
   });
 
   it("resets buffer when panel is replaced", () => {
@@ -156,6 +164,8 @@ describe("Fanout", () => {
     fanout.activateTrace("t2", [], false);
     fanout.broadcastSpan("t2", makeSpan("s1", "t2"), "svc");
 
-    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ command: "appendSpan", traceId: "t2" }));
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "appendSpan", traceId: "t2" }),
+    );
   });
 });
