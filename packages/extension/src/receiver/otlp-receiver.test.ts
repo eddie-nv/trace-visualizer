@@ -41,7 +41,7 @@ describe("processOtlpBody", () => {
 
     expect(result.status).toBe(200);
     expect(store.getConversations()).toHaveLength(1);
-    expect(store.getConversations()[0]?.spans[0]?.spanId).toBe("span1");
+    expect(store.getConversations()[0]?.spans[0]?.span.spanId).toBe("span1");
   });
 
   it("calls onSpan callback for each span added", () => {

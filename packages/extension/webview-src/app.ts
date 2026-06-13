@@ -3,9 +3,10 @@ import type { OtlpSpan } from "../src/receiver/otlp-types.js";
 import type { ViewModel } from "./store/view-model.js";
 import { TraceStore } from "./store/trace-store.js";
 import { buildLayout } from "./layout/swimlane.js";
+import type { SwimlaneLayout } from "./layout/swimlane.js";
 import { injectThemeVars } from "./renderer/theme.js";
 import { createScene } from "./renderer/scene.js";
-import { renderColumns, clearColumns } from "./renderer/columns.js";
+import { renderColumns, renderFooterColumns, clearColumns } from "./renderer/columns.js";
 import { renderArrows, renderSpanEvents, clearArrows } from "./renderer/arrows.js";
 import { renderActionNodes, clearActionNodes } from "./renderer/action-nodes.js";
 import { renderFragments, clearFragments } from "./renderer/fragments.js";
@@ -30,13 +31,17 @@ const scene = createScene(diagramContainer);
 const store = new TraceStore();
 const spanIndex = new Map<string, OtlpSpan>();
 
-function buildRowMap(layout: ReturnType<typeof buildLayout>) {
-  const rowMap = new Map(layout.rows.map((r) => [r.id, r]));
-  return rowMap;
+let lastVm: ViewModel | undefined = undefined;
+let lastLayout: SwimlaneLayout | undefined = undefined;
+
+function buildRowMap(layout: SwimlaneLayout) {
+  return new Map(layout.rows.map((r) => [r.id, r]));
 }
 
 function renderViewModel(vm: ViewModel): void {
   const layout = buildLayout(vm);
+  lastVm = vm;
+  lastLayout = layout;
   const rowMap = buildRowMap(layout);
 
   renderColumns(scene.lifelines, vm.participants, layout.columns, layout.totalHeight);
@@ -64,6 +69,8 @@ function resetScene(): void {
   scene.arrows.innerHTML = "";
   scene.nodes.innerHTML = "";
   scene.fragments.innerHTML = "";
+  lastVm = undefined;
+  lastLayout = undefined;
 }
 
 store.subscribe(renderViewModel);
@@ -90,6 +97,14 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
       break;
     }
     case "traceComplete": {
+      if (lastVm && lastLayout) {
+        renderFooterColumns(scene.lifelines, lastVm.participants, lastLayout.columns, lastLayout.totalHeight);
+      }
+      break;
+    }
+    case "themeChange": {
+      // VS Code automatically updates its CSS variables in the webview on theme change.
+      // Our --tv-* vars reference those directly, so no explicit action is needed.
       break;
     }
   }

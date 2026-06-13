@@ -35,7 +35,7 @@ describe("SpanStore", () => {
     expect(convs).toHaveLength(1);
     expect(convs[0]?.traceId).toBe("abc123");
     expect(convs[0]?.spans).toHaveLength(1);
-    expect(convs[0]?.spans[0]?.spanId).toBe("s1");
+    expect(convs[0]?.spans[0]?.span.spanId).toBe("s1");
   });
 
   it("appends subsequent spans to the same trace", () => {

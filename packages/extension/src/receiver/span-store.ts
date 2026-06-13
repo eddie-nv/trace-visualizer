@@ -1,9 +1,14 @@
 import { getStringAttr, type OtlpResourceSpan, type OtlpSpan } from "./otlp-types.js";
 
+export interface SpanEntry {
+  readonly span: OtlpSpan;
+  readonly serviceName: string;
+}
+
 export interface TracedConversation {
   readonly traceId: string;
   readonly rootSpan: OtlpSpan | undefined;
-  readonly spans: ReadonlyArray<OtlpSpan>;
+  readonly spans: ReadonlyArray<SpanEntry>;
   readonly servicesSeen: ReadonlySet<string>;
   readonly complete: boolean;
 }
@@ -16,13 +21,14 @@ export class SpanStore {
   addSpan(resourceSpan: OtlpResourceSpan, span: OtlpSpan): void {
     const serviceName = getStringAttr(resourceSpan.resource?.attributes, "service.name") ?? "unknown";
     const isRoot = !span.parentSpanId;
+    const entry: SpanEntry = { span, serviceName };
 
     const existing = this.traces.get(span.traceId);
     if (!existing) {
       this.traces.set(span.traceId, {
         traceId: span.traceId,
         rootSpan: isRoot ? span : undefined,
-        spans: [span],
+        spans: [entry],
         servicesSeen: new Set([serviceName]),
         complete: isRoot,
       });
@@ -38,7 +44,7 @@ export class SpanStore {
     this.traces.set(span.traceId, {
       ...existing,
       rootSpan: isRoot ? span : existing.rootSpan,
-      spans: [...existing.spans, span],
+      spans: [...existing.spans, entry],
       servicesSeen: new Set([...existing.servicesSeen, serviceName]),
       complete: isRoot ? true : existing.complete,
     });
@@ -54,8 +60,8 @@ export class SpanStore {
 
   getSpan(spanId: string): OtlpSpan | undefined {
     for (const conv of this.traces.values()) {
-      const found = conv.spans.find((s) => s.spanId === spanId);
-      if (found !== undefined) return found;
+      const found = conv.spans.find((e) => e.span.spanId === spanId);
+      if (found !== undefined) return found.span;
     }
     return undefined;
   }

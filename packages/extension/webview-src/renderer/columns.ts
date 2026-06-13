@@ -1,6 +1,6 @@
 import type { Participant } from "../store/view-model.js";
 import type { ColumnLayout } from "../layout/swimlane.js";
-import { HEADER_HEIGHT } from "../layout/swimlane.js";
+import { HEADER_HEIGHT, ROW_GAP } from "../layout/swimlane.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const HEADER_BOX_HEIGHT = 40;
@@ -68,6 +68,51 @@ export function renderColumns(
     lifelinesG.appendChild(g);
 
     columnElements.set(participant.id, { header: g, lifeline });
+  }
+}
+
+/** Draw mirrored service-header boxes at the bottom of each lifeline on traceComplete. */
+export function renderFooterColumns(
+  lifelinesG: SVGGElement,
+  participants: ReadonlyArray<Participant>,
+  columns: ReadonlyMap<string, ColumnLayout>,
+  totalHeight: number,
+): void {
+  const footerY = totalHeight + ROW_GAP;
+  const footerBottom = footerY + HEADER_BOX_PADDING_TOP + HEADER_BOX_HEIGHT + HEADER_BOX_PADDING_TOP;
+
+  for (const participant of participants) {
+    const col = columns.get(participant.id);
+    const entry = columnElements.get(participant.id);
+    if (!col || !entry) continue;
+
+    // Extend lifeline to bottom of footer box.
+    entry.lifeline.setAttribute("y2", String(footerBottom));
+
+    const halfW = col.width / 2;
+    const boxX = col.x - halfW;
+
+    const rect = document.createElementNS(SVG_NS, "rect");
+    rect.setAttribute("x", String(boxX));
+    rect.setAttribute("y", String(footerY + HEADER_BOX_PADDING_TOP));
+    rect.setAttribute("width", String(col.width));
+    rect.setAttribute("height", String(HEADER_BOX_HEIGHT));
+    rect.setAttribute("rx", "4");
+    rect.setAttribute("fill", "var(--tv-header-fill)");
+    rect.setAttribute("stroke", "var(--tv-border)");
+    rect.setAttribute("stroke-width", "1");
+
+    const text = document.createElementNS(SVG_NS, "text");
+    text.setAttribute("x", String(col.x));
+    text.setAttribute("y", String(footerY + HEADER_BOX_PADDING_TOP + HEADER_BOX_HEIGHT / 2 + 5));
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("fill", "var(--tv-text)");
+    text.setAttribute("font-size", "12");
+    text.setAttribute("font-family", "var(--vscode-font-family, monospace)");
+    text.textContent = truncate(participant.label, 20);
+
+    lifelinesG.appendChild(rect);
+    lifelinesG.appendChild(text);
   }
 }
 

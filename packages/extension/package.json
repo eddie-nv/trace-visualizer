@@ -19,6 +19,15 @@
         "title": "AgentGraph: Open Trace Visualizer"
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "agentgraph.traceList",
+          "name": "AgentGraph Traces"
+        }
+      ]
+    },
     "configuration": {
       "title": "AgentGraph",
       "properties": {
