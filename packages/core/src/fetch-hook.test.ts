@@ -14,6 +14,7 @@ import {
   SUPPRESS_FETCH_SPAN_KEY,
   uninstrumentFetch,
 } from "@agentgraph/core";
+import type { TimedEvent } from "@opentelemetry/sdk-trace-base";
 
 const exporter = new InMemorySpanExporter();
 const realFetch = globalThis.fetch;
@@ -686,6 +687,75 @@ describe("openai streaming", () => {
     const span = await waitForSingleSpan();
     expect(span.attributes[ATTR.USAGE_INPUT_TOKENS]).toBe(10);
     expect(span.attributes[ATTR.USAGE_OUTPUT_TOKENS]).toBe(5);
+  });
+});
+
+describe("stream events (R3)", () => {
+  it("records gen_ai.stream.first_chunk and gen_ai.stream.finish on a streaming span", async () => {
+    // Arrange
+    installFetchMock(async () => sseResponse(ANTHROPIC_SSE_FIXTURE));
+    instrumentFetch();
+
+    // Act
+    await postJson(ANTHROPIC_URL, { ...ANTHROPIC_REQUEST_BODY, stream: true });
+
+    // Assert
+    const span = await waitForSingleSpan();
+    const firstChunk = span.events.find((e: TimedEvent) => e.name === "gen_ai.stream.first_chunk");
+    const finish = span.events.find((e: TimedEvent) => e.name === "gen_ai.stream.finish");
+    expect(firstChunk).toBeDefined();
+    expect(finish).toBeDefined();
+    // finish time must not precede first_chunk time (compare seconds component of HrTime)
+    expect(finish!.time[0] * 1e9 + finish!.time[1]).toBeGreaterThanOrEqual(
+      firstChunk!.time[0] * 1e9 + firstChunk!.time[1],
+    );
+  });
+
+  it("does not add stream events for non-streaming (JSON) responses", async () => {
+    // Arrange
+    installFetchMock(async () => jsonResponse(ANTHROPIC_RESPONSE_BODY));
+    instrumentFetch();
+
+    // Act
+    await postJson(ANTHROPIC_URL, ANTHROPIC_REQUEST_BODY);
+
+    // Assert
+    const span = await waitForSingleSpan();
+    expect(span.events.some((e: TimedEvent) => e.name === "gen_ai.stream.first_chunk")).toBe(false);
+    expect(span.events.some((e: TimedEvent) => e.name === "gen_ai.stream.finish")).toBe(false);
+  });
+});
+
+describe("code location attributes (R6)", () => {
+  it("stamps non-empty code.file.path, code.line.number, and code.function.name on every LLM span", async () => {
+    // Arrange
+    installFetchMock(async () => jsonResponse(ANTHROPIC_RESPONSE_BODY));
+    instrumentFetch();
+
+    // Act
+    await postJson(ANTHROPIC_URL, ANTHROPIC_REQUEST_BODY);
+
+    // Assert
+    const span = await waitForSingleSpan();
+    expect(typeof span.attributes[ATTR.CODE_FILE]).toBe("string");
+    expect((span.attributes[ATTR.CODE_FILE] as string).length).toBeGreaterThan(0);
+    expect(typeof span.attributes[ATTR.CODE_LINE]).toBe("number");
+    expect((span.attributes[ATTR.CODE_LINE] as number)).toBeGreaterThan(0);
+    expect(span.attributes[ATTR.CODE_FUNCTION]).toBeDefined();
+  });
+
+  it("stamps code.* on streaming spans as well", async () => {
+    // Arrange
+    installFetchMock(async () => sseResponse(ANTHROPIC_SSE_FIXTURE));
+    instrumentFetch();
+
+    // Act
+    await postJson(ANTHROPIC_URL, { ...ANTHROPIC_REQUEST_BODY, stream: true });
+
+    // Assert
+    const span = await waitForSingleSpan();
+    expect(typeof span.attributes[ATTR.CODE_FILE]).toBe("string");
+    expect((span.attributes[ATTR.CODE_FILE] as string).length).toBeGreaterThan(0);
   });
 });
 

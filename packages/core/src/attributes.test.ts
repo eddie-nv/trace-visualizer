@@ -42,6 +42,14 @@ describe("ATTR", () => {
   });
 });
 
+describe("ATTR code location constants (R6)", () => {
+  it("defines OTel semconv code attribute names", () => {
+    expect(ATTR.CODE_FILE).toBe("code.file.path");
+    expect(ATTR.CODE_LINE).toBe("code.line.number");
+    expect(ATTR.CODE_FUNCTION).toBe("code.function.name");
+  });
+});
+
 describe("CONTENT_ATTRIBUTES", () => {
   it("contains exactly the four content-gated attributes", () => {
     // DESIGN §4 — gating drops only these; usage/model/finish_reasons stay.

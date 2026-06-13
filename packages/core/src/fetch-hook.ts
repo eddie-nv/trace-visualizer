@@ -1,5 +1,6 @@
 import { context, SpanStatusCode, type Span } from "@opentelemetry/api";
 import { ATTR } from "./attributes.js";
+import { captureCallerFrame, type CallerFrame } from "./caller-frame.js";
 import { shouldSendContent, type CoreConfig } from "./content-gating.js";
 import { isRecord, type ParsedRequest, type ProviderAdapter } from "./provider-types.js";
 import { matchProviderAdapter, type MatchOriginOverrides } from "./providers.js";
@@ -113,7 +114,10 @@ function createWrapper(original: Fetch, config: FetchHookConfig | undefined): Fe
     if (adapter === undefined) {
       return original(input, init);
     }
-    return instrumentedCall(original, config, adapter, input, init);
+    // Capture the caller frame synchronously here, before the async chain
+    // begins, so the stack still includes the user's call site (R6).
+    const callerFrame = captureCallerFrame();
+    return instrumentedCall(original, config, adapter, input, init, callerFrame);
   };
 }
 
@@ -155,16 +159,21 @@ interface SpanObservation {
   readonly sendContent: boolean;
 }
 
+// SSE event names for stream timing markers (DESIGN §M8 R3).
+const SSE_EVENT_FIRST_CHUNK = "gen_ai.stream.first_chunk";
+const SSE_EVENT_FINISH = "gen_ai.stream.finish";
+
 async function instrumentedCall(
   original: Fetch,
   config: CoreConfig | undefined,
   adapter: ProviderAdapter,
   input: FetchInput,
-  init?: FetchInit,
+  init: FetchInit | undefined,
+  callerFrame: CallerFrame | undefined,
 ): Promise<Response> {
   let observation: SpanObservation | undefined;
   try {
-    observation = await beginObservation(config, adapter, input, init);
+    observation = await beginObservation(config, adapter, input, init, callerFrame);
   } catch {
     // No span exists yet, so the only visibility channel is the console.
     warnOnce("span-setup", "failed to start an LLM span; matched calls are not being traced");
@@ -196,11 +205,12 @@ async function beginObservation(
   config: CoreConfig | undefined,
   adapter: ProviderAdapter,
   input: FetchInput,
-  init?: FetchInit,
+  init: FetchInit | undefined,
+  callerFrame: CallerFrame | undefined,
 ): Promise<SpanObservation> {
   const parsed = parseRequestBody(adapter, await readRequestBodyText(input, init));
   const sendContent = shouldSendContent(config, context.active());
-  const span = startLLMSpan(adapter, parsed, sendContent);
+  const span = startLLMSpan(adapter, parsed, sendContent, callerFrame);
   return { span, adapter, sendContent };
 }
 
@@ -318,7 +328,12 @@ async function finishStreaming(observation: SpanObservation, branch: Response): 
   let eventFailures = 0;
   try {
     if (branch.body !== null) {
+      let firstChunkSeen = false;
       for await (const event of parseSseStream(branch.body)) {
+        if (!firstChunkSeen) {
+          firstChunkSeen = true;
+          span.addEvent(SSE_EVENT_FIRST_CHUNK);
+        }
         try {
           accumulator.onEvent(event);
         } catch {
@@ -326,6 +341,9 @@ async function finishStreaming(observation: SpanObservation, branch: Response): 
           // accumulator bug; count it so the span shows the loss.
           eventFailures += 1;
         }
+      }
+      if (firstChunkSeen) {
+        span.addEvent(SSE_EVENT_FINISH);
       }
     }
     applyParsedResponse(span, observation.sendContent, accumulator.finish());

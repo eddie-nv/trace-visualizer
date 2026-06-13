@@ -15,6 +15,7 @@
  */
 import { context, type Span } from "@opentelemetry/api";
 import { ATTR } from "./attributes.js";
+import { captureCallerFrame } from "./caller-frame.js";
 import { shouldSendContent, type CoreConfig } from "./content-gating.js";
 import { anthropicAdapter } from "./provider-anthropic.js";
 import { openaiAdapter } from "./provider-openai.js";
@@ -150,6 +151,8 @@ function createWrappedCreate(
   config: CoreConfig | undefined,
 ): AnyFn {
   return function agentgraphCreate(this: unknown, ...args: unknown[]): unknown {
+    // Capture synchronously before any awaits so the stack still shows user code.
+    const callerFrame = captureCallerFrame();
     let observation: SpanObservation | undefined;
     try {
       const params = isRecord(args[0]) ? args[0] : undefined;
@@ -158,6 +161,7 @@ function createWrappedCreate(
         adapter,
         params === undefined ? undefined : adapter.parseRequest(params),
         sendContent,
+        callerFrame,
       );
       observation = { span, sendContent };
     } catch {

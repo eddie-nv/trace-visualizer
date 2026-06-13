@@ -32,6 +32,10 @@ export const ATTR = {
   TOOL_DEFINITIONS: "gen_ai.tool.definitions",
   OUTPUT_MESSAGES: "gen_ai.output.messages",
   GEN_AI_CONVERSATION_ID: "gen_ai.conversation.id",
+  /** OTel semconv code location attributes — stamped on every shim-emitted span (DESIGN §M8 R6). */
+  CODE_FILE: "code.file.path",
+  CODE_LINE: "code.line.number",
+  CODE_FUNCTION: "code.function.name",
   AGENT_ID: "agentgraph.agent.id",
   AGENT_FINGERPRINT: "agentgraph.agent.fingerprint",
   CONVERSATION_ID: "agentgraph.conversation.id",
