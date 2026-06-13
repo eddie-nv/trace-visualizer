@@ -6,10 +6,12 @@
  */
 import { SpanKind, trace, type Span } from "@opentelemetry/api";
 import { ATTR } from "./attributes.js";
+import type { CallerFrame } from "./caller-frame.js";
 import { computeAgentFingerprint } from "./fingerprint.js";
 import type { ParsedRequest, ParsedResponse, ProviderAdapter } from "./provider-types.js";
 import {
   applyUsage,
+  setCallerAttributes,
   setJsonAttribute,
   setNumberAttribute,
   setStringAttribute,
@@ -24,6 +26,7 @@ export function startLLMSpan(
   adapter: ProviderAdapter,
   parsed: ParsedRequest | undefined,
   sendContent: boolean,
+  callerFrame?: CallerFrame,
 ): Span {
   const tracer = trace.getTracer(TRACER_NAME);
   const span = tracer.startSpan(
@@ -36,6 +39,7 @@ export function startLLMSpan(
       },
     },
   );
+  setCallerAttributes(span, callerFrame);
   if (parsed === undefined) {
     span.setAttribute(ATTR.WARN, "request body not parseable");
     return span;

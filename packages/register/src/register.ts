@@ -1,4 +1,6 @@
 import { init } from "@agentgraph/sdk";
+import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
 
 /**
  * Cross-copy handshake state stored on `globalThis.__AGENTGRAPH__` (DESIGN §1,
@@ -18,6 +20,7 @@ export interface AgentGraphGlobalCarrier {
 /** Injectable seams for tests; production callers pass nothing. */
 export interface RegisterOptions {
   initFn?: () => void;
+  httpInstrumentFn?: () => void;
   globalObj?: AgentGraphGlobalCarrier;
 }
 
@@ -28,25 +31,40 @@ export interface RegisterOptions {
  * does not re-attempt and warn a second time — all failures collapse into a
  * single `console.warn`, and the host app is never crashed by the preload.
  */
+function defaultHttpInstrumentFn(): void {
+  registerInstrumentations({ instrumentations: [new HttpInstrumentation()] });
+}
+
 export function register(options: RegisterOptions = {}): void {
-  const { initFn = init, globalObj = globalThis as AgentGraphGlobalCarrier } = options;
+  const {
+    initFn = init,
+    httpInstrumentFn = defaultHttpInstrumentFn,
+    globalObj = globalThis as AgentGraphGlobalCarrier,
+  } = options;
   try {
     if (globalObj.__AGENTGRAPH__?.registered === true) {
       return;
     }
     globalObj.__AGENTGRAPH__ = { ...globalObj.__AGENTGRAPH__, registered: true };
+    // R1: HTTP instrumentation is best-effort — a failure here (e.g. unsupported
+    // runtime) degrades only root-span parenting, not LLM call tracing.
+    try {
+      httpInstrumentFn();
+    } catch (httpError) {
+      warnRegistrationFailure(httpError, "HTTP instrumentation failed; HTTP root spans disabled");
+    }
     initFn();
   } catch (error) {
     warnRegistrationFailure(error);
   }
 }
 
-function warnRegistrationFailure(error: unknown): void {
+function warnRegistrationFailure(error: unknown, prefix = "preload registration failed; tracing is disabled"): void {
   const detail = error instanceof Error ? error.message : String(error);
   try {
     // The raw error rides along as a second argument so Node/Bun print the
     // stack — in a preload there is no other diagnostic channel.
-    console.warn(`agentgraph: preload registration failed; tracing is disabled (${detail})`, error);
+    console.warn(`agentgraph: ${prefix} (${detail})`, error);
   } catch {
     // console.warn itself was removed or replaced with a throwing stub;
     // absorbing is the only option that honors never-crash-the-host (DESIGN §1).

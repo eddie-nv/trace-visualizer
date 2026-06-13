@@ -32,7 +32,9 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --clean --no-splitting"
   },
   "dependencies": {
-    "@agentgraph/sdk": "*"
+    "@agentgraph/sdk": "*",
+    "@opentelemetry/instrumentation": "^0.219.0",
+    "@opentelemetry/instrumentation-http": "^0.219.0"
   },
   "peerDependencies": {
     "@opentelemetry/api": "^1.9.0"

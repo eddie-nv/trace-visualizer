@@ -141,6 +141,59 @@ describe("register", () => {
     expect(globalObj.__AGENTGRAPH__?.registered).toBe(true);
   });
 
+  it("calls httpInstrumentFn before initFn on first registration (R1)", () => {
+    // Arrange
+    const callOrder: string[] = [];
+    const httpInstrumentFn = vi.fn(() => {
+      callOrder.push("http");
+    });
+    const initFn = vi.fn(() => {
+      callOrder.push("init");
+    });
+    const globalObj: AgentGraphGlobalCarrier = {};
+
+    // Act
+    register({ initFn, httpInstrumentFn, globalObj });
+
+    // Assert
+    expect(httpInstrumentFn).toHaveBeenCalledTimes(1);
+    expect(initFn).toHaveBeenCalledTimes(1);
+    expect(callOrder).toEqual(["http", "init"]);
+  });
+
+  it("skips httpInstrumentFn when already registered", () => {
+    // Arrange
+    const httpInstrumentFn = vi.fn();
+    const initFn = vi.fn();
+    const globalObj: AgentGraphGlobalCarrier = { __AGENTGRAPH__: { registered: true } };
+
+    // Act
+    register({ initFn, httpInstrumentFn, globalObj });
+
+    // Assert
+    expect(httpInstrumentFn).not.toHaveBeenCalled();
+  });
+
+  it("still calls initFn when httpInstrumentFn throws (isolated failure)", () => {
+    // Arrange — R1 failure should only degrade HTTP root spans, not LLM tracing
+    const httpInstrumentFn = vi.fn(() => {
+      throw new Error("HttpInstrumentation unavailable");
+    });
+    const initFn = vi.fn();
+    const globalObj: AgentGraphGlobalCarrier = {};
+
+    // Act
+    register({ initFn, httpInstrumentFn, globalObj });
+
+    // Assert
+    expect(initFn).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("HTTP instrumentation failed"),
+      expect.any(Error),
+    );
+  });
+
   it("does not throw even when console.warn itself throws", () => {
     // Arrange — a host may replace console.warn with a throwing stub
     warnSpy.mockImplementation(() => {

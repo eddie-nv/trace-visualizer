@@ -1,5 +1,6 @@
 import { SpanStatusCode, type Span } from "@opentelemetry/api";
 import { ATTR } from "./attributes.js";
+import type { CallerFrame } from "./caller-frame.js";
 import type { Usage } from "./manual.js";
 
 /** Shared span-attribute helpers used by every emission path (DESIGN §2). */
@@ -44,6 +45,16 @@ export function recordSpanError(span: Span, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   span.recordException(error instanceof Error ? error : message);
   span.setStatus({ code: SpanStatusCode.ERROR, message });
+}
+
+/** Stamps OTel semconv `code.*` attributes from a captured caller frame (DESIGN §M8 R6). */
+export function setCallerAttributes(span: Span, frame: CallerFrame | undefined): void {
+  if (frame === undefined) {
+    return;
+  }
+  span.setAttribute(ATTR.CODE_FILE, frame.file);
+  span.setAttribute(ATTR.CODE_LINE, frame.line);
+  span.setAttribute(ATTR.CODE_FUNCTION, frame.fn);
 }
 
 /** Semconv `gen_ai.system_instructions` shape: plain strings become parts. */
