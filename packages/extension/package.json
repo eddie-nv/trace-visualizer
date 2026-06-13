@@ -1,0 +1,51 @@
+{
+  "name": "@agentgraph/extension",
+  "version": "0.0.0",
+  "description": "AgentGraph VS Code extension: OTLP receiver, span store, and webview visualizer",
+  "type": "module",
+  "private": true,
+  "publisher": "agentgraph",
+  "displayName": "AgentGraph",
+  "categories": ["Visualization", "Other"],
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.cjs",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agentgraph.open",
+        "title": "AgentGraph: Open Trace Visualizer"
+      }
+    ],
+    "configuration": {
+      "title": "AgentGraph",
+      "properties": {
+        "agentgraph.receiverPort": {
+          "type": "number",
+          "default": 4319,
+          "description": "Port for the local OTLP/HTTP receiver. Set AGENTGRAPH_ENDPOINT=http://localhost:<port> in your app."
+        },
+        "agentgraph.jaegerEndpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Jaeger OTLP endpoint to forward spans to (e.g. http://localhost:4318). Leave empty to disable forwarding."
+        }
+      }
+    }
+  },
+  "files": ["dist", "webview-src/app.html"],
+  "scripts": {
+    "build": "npm run build:host && npm run build:webview",
+    "build:host": "esbuild src/extension.ts --bundle --sourcemap --platform=node --target=node20 --format=cjs --external:vscode --outfile=dist/extension.cjs",
+    "build:webview": "esbuild webview-src/app.ts --bundle --sourcemap --platform=browser --target=es2022 --format=iife --outfile=dist/webview.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@types/vscode": "^1.96.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3"
+  }
+}
