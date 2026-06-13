@@ -1,0 +1,48 @@
+import * as http from "node:http";
+import { trace, SpanKind } from "@opentelemetry/api";
+
+const PORT = 3003;
+const tracer = trace.getTracer("agentgraph-demo");
+
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+    req.on("error", reject);
+  });
+}
+
+const server = http.createServer(async (req, res) => {
+  if (req.method !== "POST" || req.url !== "/tool") {
+    res.writeHead(404);
+    res.end("Not found");
+    return;
+  }
+
+  try {
+    const body = JSON.parse(await readBody(req)) as { task?: string };
+
+    const result = await tracer.startActiveSpan(
+      "tool.web_search",
+      { kind: SpanKind.INTERNAL, attributes: { "tool.name": "web_search", "tool.input": body.task ?? "" } },
+      async (span) => {
+        await new Promise<void>((r) => setTimeout(r, 80));
+        const output = "Found 3 relevant results.";
+        span.setAttribute("tool.output", output);
+        span.end();
+        return output;
+      },
+    );
+
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, result }));
+  } catch (err) {
+    res.writeHead(500, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: false, error: String(err) }));
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`listening on :${PORT}`);
+});
