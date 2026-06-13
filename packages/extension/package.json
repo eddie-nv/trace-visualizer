@@ -1,5 +1,5 @@
 {
-  "name": "@agentgraph/extension",
+  "name": "agentgraph",
   "version": "0.0.0",
   "description": "AgentGraph VS Code extension: OTLP receiver, span store, and webview visualizer",
   "type": "module",
@@ -49,20 +49,18 @@
       }
     }
   },
-  "files": [
-    "dist",
-    "webview-src/app.html"
-  ],
   "scripts": {
     "build": "npm run build:host && npm run build:webview && npm run build:mcp",
     "build:host": "esbuild src/extension.ts --bundle --sourcemap --platform=node --target=node20 --format=cjs --external:vscode --outfile=dist/extension.cjs",
     "build:webview": "esbuild webview-src/app.ts --bundle --sourcemap --platform=browser --target=es2022 --format=iife --outfile=dist/webview.js",
     "build:mcp": "esbuild src/mcp/server.ts --bundle --sourcemap --platform=node --target=node20 --format=cjs --outfile=dist/mcp.js",
+    "build:vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
     "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.4.1",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.3"
   },

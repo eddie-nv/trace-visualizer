@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 *.log
+*.vsix
 .env
 .env.*
 .DS_Store
