@@ -25,7 +25,8 @@
     "test:b": "node scripts/test-b/run.ts",
     "test:ac": "node scripts/test-c/run.ts",
     "test:f": "node scripts/test-f/run.ts",
-    "demo": "node demo/start.ts"
+    "demo": "node demo/start.ts",
+    "demo:smoke": "node scripts/demo-smoke.ts"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",

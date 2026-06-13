@@ -1,5 +1,7 @@
 import * as http from "node:http";
-import { trace, SpanKind } from "@opentelemetry/api";
+import { context, propagation, trace, SpanKind, ROOT_CONTEXT } from "@opentelemetry/api";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
+propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
 const PORT = 3003;
 const tracer = trace.getTracer("agentgraph-demo");
@@ -20,27 +22,39 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  try {
-    const body = JSON.parse(await readBody(req)) as { task?: string };
-
-    const result = await tracer.startActiveSpan(
-      "tool.web_search",
-      { kind: SpanKind.INTERNAL, attributes: { "tool.name": "web_search", "tool.input": body.task ?? "" } },
-      async (span) => {
-        await new Promise<void>((r) => setTimeout(r, 80));
-        const output = "Found 3 relevant results.";
-        span.setAttribute("tool.output", output);
-        span.end();
-        return output;
-      },
-    );
-
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, result }));
-  } catch (err) {
-    res.writeHead(500, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: false, error: String(err) }));
+  // Extract W3C traceparent from incoming headers to continue the trace from agent-a.
+  const carrier: Record<string, string> = {};
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (typeof v === "string") carrier[k] = v;
   }
+  const parentContext = propagation.extract(ROOT_CONTEXT, carrier);
+
+  await context.with(parentContext, async () => {
+    try {
+      const body = JSON.parse(await readBody(req)) as { task?: string };
+
+      const result = await tracer.startActiveSpan(
+        "tool.web_search",
+        {
+          kind: SpanKind.INTERNAL,
+          attributes: { "tool.name": "web_search", "tool.input": body.task ?? "" },
+        },
+        async (span) => {
+          await new Promise<void>((r) => setTimeout(r, 80));
+          const output = "Found 3 relevant results.";
+          span.setAttribute("tool.output", output);
+          span.end();
+          return output;
+        },
+      );
+
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, result }));
+    } catch (err) {
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: String(err) }));
+    }
+  });
 });
 
 server.listen(PORT, () => {
