@@ -54,9 +54,10 @@
     "webview-src/app.html"
   ],
   "scripts": {
-    "build": "npm run build:host && npm run build:webview",
+    "build": "npm run build:host && npm run build:webview && npm run build:mcp",
     "build:host": "esbuild src/extension.ts --bundle --sourcemap --platform=node --target=node20 --format=cjs --external:vscode --outfile=dist/extension.cjs",
     "build:webview": "esbuild webview-src/app.ts --bundle --sourcemap --platform=browser --target=es2022 --format=iife --outfile=dist/webview.js",
+    "build:mcp": "esbuild src/mcp/server.ts --bundle --sourcemap --platform=node --target=node20 --format=cjs --outfile=dist/mcp.js",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -64,5 +65,8 @@
     "@types/vscode": "^1.96.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }

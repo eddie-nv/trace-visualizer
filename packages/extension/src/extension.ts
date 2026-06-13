@@ -6,6 +6,7 @@ import { createOtlpReceiver } from "./receiver/otlp-receiver.js";
 import { registerCommands } from "./commands.js";
 import { TraceSidebarProvider } from "./webview/sidebar.js";
 import { getOrCreatePanel } from "./webview/panel.js";
+import { writeTraces } from "./mcp/ipc-store.js";
 
 let server: Server | undefined;
 
@@ -48,6 +49,11 @@ export function activate(context: vscode.ExtensionContext): void {
         fanout.broadcastTraceComplete(traceId);
       }
       sidebar.refresh();
+      try {
+        writeTraces(store.getConversations());
+      } catch {
+        // Never crash the extension if the MCP store write fails.
+      }
     },
     onError: (err) => {
       outputChannel.appendLine(`[AgentGraph] receiver error: ${err.message}`);
