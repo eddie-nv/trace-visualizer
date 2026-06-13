@@ -4,5 +4,7 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
-      - "127.0.0.1:4318:4318" # OTLP HTTP ingest
+      - "127.0.0.1:4318:4318" # OTLP HTTP ingest (Jaeger)
       - "127.0.0.1:16686:16686" # UI + query API
+# Extension OTLP receiver listens on 127.0.0.1:4319 (host-only, no Docker service needed).
+# Set AGENTGRAPH_ENDPOINT=http://localhost:4319 in your app to send spans to the VS Code extension.

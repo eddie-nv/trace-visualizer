@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentGraph</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--vscode-editor-background, #1e1e1e);
+      color: var(--vscode-editor-foreground, #d4d4d4);
+      font-family: var(--vscode-font-family, monospace);
+    }
+
+    #diagram {
+      width: 100%;
+      height: 100%;
+    }
+
+    .ag-arrow {
+      cursor: pointer;
+    }
+
+    .ag-arrow:hover line:first-child {
+      stroke-opacity: 0.8;
+    }
+
+    .ag-action-node {
+      cursor: pointer;
+    }
+
+    .ag-action-node:hover rect {
+      stroke: var(--vscode-focusBorder, #007fd4);
+    }
+  </style>
+</head>
+<body>
+  <div id="diagram"></div>
+  <!-- webview.js injected by panel.ts with nonce -->
+</body>
+</html>
