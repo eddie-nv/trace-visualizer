@@ -22,14 +22,13 @@ export class SpanStore {
     const serviceName =
       getStringAttr(resourceSpan.resource?.attributes, "service.name") ?? "unknown";
     const isRoot = !span.parentSpanId;
-    const entry: SpanEntry = { span, serviceName };
 
     const existing = this.traces.get(span.traceId);
     if (!existing) {
       this.traces.set(span.traceId, {
         traceId: span.traceId,
         rootSpan: isRoot ? span : undefined,
-        spans: [entry],
+        spans: [{ span, serviceName }],
         servicesSeen: new Set([serviceName]),
         complete: isRoot,
       });
@@ -42,10 +41,15 @@ export class SpanStore {
       return;
     }
 
+    // Skip exact duplicate spans (same spanId) — can arrive via OTLP retry.
+    if (existing.spans.some((e) => e.span.spanId === span.spanId)) {
+      return;
+    }
+
     this.traces.set(span.traceId, {
       ...existing,
       rootSpan: isRoot ? span : existing.rootSpan,
-      spans: [...existing.spans, entry],
+      spans: [...existing.spans, { span, serviceName }],
       servicesSeen: new Set([...existing.servicesSeen, serviceName]),
       complete: isRoot ? true : existing.complete,
     });
