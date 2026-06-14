@@ -45,6 +45,7 @@ describe("buildLayout — row y positions", () => {
       ...BASE_VM,
       arrows: [
         {
+          kind: "observed" as const,
           id: "a1-req",
           fromParticipantId: "A",
           toParticipantId: "M",
@@ -67,6 +68,7 @@ describe("buildLayout — row y positions", () => {
       ...BASE_VM,
       arrows: [
         {
+          kind: "observed" as const,
           id: "a1-req",
           fromParticipantId: "A",
           toParticipantId: "M",
@@ -76,6 +78,7 @@ describe("buildLayout — row y positions", () => {
           spanId: "a1",
         },
         {
+          kind: "observed" as const,
           id: "a1-ret",
           fromParticipantId: "M",
           toParticipantId: "A",
@@ -97,6 +100,7 @@ describe("buildLayout — row y positions", () => {
       ...BASE_VM,
       actionNodes: [
         {
+          kind: "observed" as const,
           id: "node1",
           participantId: "A",
           label: "work",
@@ -116,6 +120,7 @@ describe("buildLayout — row y positions", () => {
       ...BASE_VM,
       arrows: [
         {
+          kind: "observed" as const,
           id: "a1-req",
           fromParticipantId: "A",
           toParticipantId: "M",
@@ -125,6 +130,7 @@ describe("buildLayout — row y positions", () => {
           spanId: "a1",
         },
         {
+          kind: "observed" as const,
           id: "a1-ret",
           fromParticipantId: "M",
           toParticipantId: "A",
@@ -168,6 +174,7 @@ describe("buildLayout — total height", () => {
       ...BASE_VM,
       arrows: [
         {
+          kind: "observed" as const,
           id: "a1-req",
           fromParticipantId: "A",
           toParticipantId: "M",
@@ -183,6 +190,7 @@ describe("buildLayout — total height", () => {
       arrows: [
         ...vmWith1.arrows,
         {
+          kind: "observed" as const,
           id: "a1-ret",
           fromParticipantId: "M",
           toParticipantId: "A",

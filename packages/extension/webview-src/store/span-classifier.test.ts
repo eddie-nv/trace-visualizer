@@ -136,8 +136,10 @@ describe("spansToViewModel — fixture A (Test D)", () => {
   it("produces 1 ActionNode for the root span", () => {
     const vm = spansToViewModel(ALL_ENTRIES);
     expect(vm.actionNodes).toHaveLength(1);
-    expect(vm.actionNodes[0]?.spanId).toBe("12b794a2e9552885");
-    expect(vm.actionNodes[0]?.participantId).toBe("ta-mqbcptif-1zdf");
+    const node = vm.actionNodes[0];
+    expect(node?.participantId).toBe("ta-mqbcptif-1zdf");
+    if (node === undefined || node.kind !== "observed") throw new Error("expected observed action node");
+    expect(node.spanId).toBe("12b794a2e9552885");
   });
 
   it("produces 4 span events on the model participant", () => {
@@ -235,6 +237,35 @@ describe("spansToViewModel — participant classification", () => {
     ]);
     const modelParticipant = vm.participants.find((p) => p.type === "model");
     expect(modelParticipant?.id).toBe("openai:gpt-4o");
+  });
+});
+
+describe("spansToViewModel — origin tagging", () => {
+  it("stamps kind: observed on all arrows", () => {
+    const vm = spansToViewModel(ALL_ENTRIES);
+    expect(vm.arrows.every((a) => a.kind === "observed")).toBe(true);
+  });
+
+  it("stamps kind: observed on all action nodes", () => {
+    const vm = spansToViewModel(ALL_ENTRIES);
+    expect(vm.actionNodes.every((n) => n.kind === "observed")).toBe(true);
+  });
+
+  it("observed arrow carries spanId", () => {
+    const vm = spansToViewModel(ALL_ENTRIES);
+    const first = vm.arrows[0];
+    expect(first?.kind).toBe("observed");
+    if (first === undefined || first.kind !== "observed") throw new Error("expected observed arrow");
+    expect(typeof first.spanId).toBe("string");
+    expect(first.spanId.length).toBeGreaterThan(0);
+  });
+
+  it("observed action node carries spanId", () => {
+    const vm = spansToViewModel(ALL_ENTRIES);
+    const node = vm.actionNodes[0];
+    expect(node?.kind).toBe("observed");
+    if (node === undefined || node.kind !== "observed") throw new Error("expected observed action node");
+    expect(node.spanId).toBe("12b794a2e9552885");
   });
 });
 

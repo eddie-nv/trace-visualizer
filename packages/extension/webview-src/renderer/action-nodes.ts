@@ -30,8 +30,8 @@ export function renderActionNodes(
 
     const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
     g.setAttribute("class", "ag-action-node");
-    g.dataset["spanId"] = node.spanId;
-    g.style.cursor = "pointer";
+    if (node.kind === "observed") g.dataset["spanId"] = node.spanId;
+    if (node.kind === "observed") g.style.cursor = "pointer";
 
     const rect = document.createElementNS(SVG_NS, "rect");
     rect.setAttribute("x", String(x));
@@ -54,7 +54,9 @@ export function renderActionNodes(
 
     g.appendChild(rect);
     g.appendChild(text);
-    g.addEventListener("click", () => onSpanSelected(node.spanId));
+    g.addEventListener("click", () => {
+      if (node.kind === "observed") onSpanSelected(node.spanId);
+    });
 
     nodesG.appendChild(g);
     nodeElements.set(node.id, g);

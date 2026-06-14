@@ -32,9 +32,9 @@ export function renderArrows(
 
     const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
     g.setAttribute("class", `ag-arrow ${isDashed ? "ag-arrow-dashed" : "ag-arrow-solid"}`);
-    g.dataset["spanId"] = arrow.spanId;
+    if (arrow.kind === "observed") g.dataset["spanId"] = arrow.spanId;
     g.dataset["arrowId"] = arrow.id;
-    g.style.cursor = "pointer";
+    if (arrow.kind === "observed") g.style.cursor = "pointer";
 
     const line = document.createElementNS(SVG_NS, "line");
     line.setAttribute("x1", String(x1));
@@ -72,7 +72,9 @@ export function renderArrows(
     g.appendChild(hitLine);
     g.appendChild(text);
 
-    g.addEventListener("click", () => onSpanSelected(arrow.spanId));
+    g.addEventListener("click", () => {
+      if (arrow.kind === "observed") onSpanSelected(arrow.spanId);
+    });
 
     arrowsG.appendChild(g);
     arrowElements.set(arrow.id, g);
