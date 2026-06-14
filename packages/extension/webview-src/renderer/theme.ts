@@ -15,6 +15,7 @@ export const CSS_VARS = `
     --tv-node-border: var(--vscode-editorWidget-border, #454545);
     --tv-header-fill: var(--vscode-sideBarSectionHeader-background, #2d2d2d);
     --tv-lifeline: var(--vscode-editorWidget-border, #454545);
+    --tv-inferred-opacity: 0.85;
   }
 `;
 

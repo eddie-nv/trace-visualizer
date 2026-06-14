@@ -1,13 +1,17 @@
 import type { ActionNode } from "../store/view-model.js";
 import type { ColumnLayout, RowLayout } from "../layout/swimlane.js";
+import { colorFromString } from "./color.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const NODE_WIDTH = 120;
 const NODE_HEIGHT = 28;
+const BADGE_HEIGHT = 14;
+const BADGE_PADDING_X = 6;
 
 const nodeElements = new Map<string, SVGGElement>();
 
 type SpanSelectedCallback = (spanId: string) => void;
+type CodePointerCallback = (file: string, line: number) => void;
 
 export function renderActionNodes(
   nodesG: SVGGElement,
@@ -15,6 +19,7 @@ export function renderActionNodes(
   columns: ReadonlyMap<string, ColumnLayout>,
   rowMap: ReadonlyMap<string, RowLayout>,
   onSpanSelected: SpanSelectedCallback,
+  onCodePointerClick?: CodePointerCallback,
 ): void {
   for (const node of actionNodes) {
     if (nodeElements.has(node.id)) continue;
@@ -29,34 +34,100 @@ export function renderActionNodes(
     const y = cy - NODE_HEIGHT / 2;
 
     const g = document.createElementNS(SVG_NS, "g") as SVGGElement;
-    g.setAttribute("class", "ag-action-node");
-    if (node.kind === "observed") g.dataset["spanId"] = node.spanId;
-    if (node.kind === "observed") g.style.cursor = "pointer";
 
-    const rect = document.createElementNS(SVG_NS, "rect");
-    rect.setAttribute("x", String(x));
-    rect.setAttribute("y", String(y));
-    rect.setAttribute("width", String(NODE_WIDTH));
-    rect.setAttribute("height", String(NODE_HEIGHT));
-    rect.setAttribute("rx", "3");
-    rect.setAttribute("fill", "var(--tv-node-fill)");
-    rect.setAttribute("stroke", "var(--tv-node-border)");
-    rect.setAttribute("stroke-width", "1");
+    if (node.kind === "inferred") {
+      const fillColor = colorFromString(node.participantId, 65, 35);
+      const strokeColor = colorFromString(node.participantId, 65, 50);
+      g.setAttribute("class", "ag-action-node ag-action-node-inferred");
+      g.style.opacity = "var(--tv-inferred-opacity, 0.85)";
 
-    const text = document.createElementNS(SVG_NS, "text");
-    text.setAttribute("x", String(cx));
-    text.setAttribute("y", String(cy + 4));
-    text.setAttribute("text-anchor", "middle");
-    text.setAttribute("fill", "var(--tv-text)");
-    text.setAttribute("font-size", "11");
-    text.setAttribute("font-family", "var(--vscode-font-family, monospace)");
-    text.textContent = truncate(node.label, 18);
+      const rect = document.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("x", String(x));
+      rect.setAttribute("y", String(y));
+      rect.setAttribute("width", String(NODE_WIDTH));
+      rect.setAttribute("height", String(NODE_HEIGHT));
+      rect.setAttribute("rx", "3");
+      rect.setAttribute("fill", fillColor);
+      rect.setAttribute("stroke", strokeColor);
+      rect.setAttribute("stroke-width", "1");
 
-    g.appendChild(rect);
-    g.appendChild(text);
-    g.addEventListener("click", () => {
-      if (node.kind === "observed") onSpanSelected(node.spanId);
-    });
+      const text = document.createElementNS(SVG_NS, "text");
+      text.setAttribute("x", String(cx));
+      text.setAttribute("y", String(cy + 4));
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("fill", "#ffffff");
+      text.setAttribute("font-size", "11");
+      text.setAttribute("font-family", "var(--vscode-font-family, monospace)");
+      text.textContent = truncate(node.label, 18);
+
+      g.appendChild(rect);
+      g.appendChild(text);
+
+      const { file, line } = node.codePointer;
+      const badgeLabel = truncate(`${file.split("/").pop() ?? file}:${line}`, 16);
+      const badgeY = y + NODE_HEIGHT + 2;
+      const badgeWidth = Math.min(badgeLabel.length * 6 + BADGE_PADDING_X * 2, NODE_WIDTH);
+      const badgeX = cx - badgeWidth / 2;
+
+      const badgeRect = document.createElementNS(SVG_NS, "rect");
+      badgeRect.setAttribute("x", String(badgeX));
+      badgeRect.setAttribute("y", String(badgeY));
+      badgeRect.setAttribute("width", String(badgeWidth));
+      badgeRect.setAttribute("height", String(BADGE_HEIGHT));
+      badgeRect.setAttribute("rx", String(BADGE_HEIGHT / 2));
+      badgeRect.setAttribute("fill", strokeColor);
+      badgeRect.style.cursor = "pointer";
+
+      const badgeText = document.createElementNS(SVG_NS, "text");
+      badgeText.setAttribute("x", String(cx));
+      badgeText.setAttribute("y", String(badgeY + BADGE_HEIGHT / 2 + 4));
+      badgeText.setAttribute("text-anchor", "middle");
+      badgeText.setAttribute("fill", "#ffffff");
+      badgeText.setAttribute("font-size", "9");
+      badgeText.setAttribute("font-family", "var(--vscode-font-family, monospace)");
+      badgeText.textContent = badgeLabel;
+      badgeText.style.cursor = "pointer";
+
+      const badgeG = document.createElementNS(SVG_NS, "g") as SVGGElement;
+      badgeG.setAttribute("class", "ag-code-badge");
+      badgeG.dataset["file"] = file;
+      badgeG.dataset["line"] = String(line);
+      badgeG.appendChild(badgeRect);
+      badgeG.appendChild(badgeText);
+      badgeG.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onCodePointerClick?.(file, line);
+      });
+
+      g.appendChild(badgeG);
+    } else {
+      g.setAttribute("class", "ag-action-node");
+      g.dataset["spanId"] = node.spanId;
+      g.style.cursor = "pointer";
+
+      const rect = document.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("x", String(x));
+      rect.setAttribute("y", String(y));
+      rect.setAttribute("width", String(NODE_WIDTH));
+      rect.setAttribute("height", String(NODE_HEIGHT));
+      rect.setAttribute("rx", "3");
+      rect.setAttribute("fill", "var(--tv-node-fill)");
+      rect.setAttribute("stroke", "var(--tv-node-border)");
+      rect.setAttribute("stroke-width", "1");
+
+      const text = document.createElementNS(SVG_NS, "text");
+      text.setAttribute("x", String(cx));
+      text.setAttribute("y", String(cy + 4));
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("fill", "var(--tv-text)");
+      text.setAttribute("font-size", "11");
+      text.setAttribute("font-family", "var(--vscode-font-family, monospace)");
+      text.textContent = truncate(node.label, 18);
+
+      g.appendChild(rect);
+      g.appendChild(text);
+      g.addEventListener("click", () => onSpanSelected(node.spanId));
+    }
 
     nodesG.appendChild(g);
     nodeElements.set(node.id, g);
