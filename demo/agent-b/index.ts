@@ -37,12 +37,14 @@ const server = http.createServer(async (req, res) => {
         "tool.web_search",
         {
           kind: SpanKind.INTERNAL,
-          attributes: { "tool.name": "web_search", "tool.input": body.task ?? "" },
+          // ai.toolCall.* keys are required for span-classifier.ts#isToolSpan()
+          // to draw request/response arrows instead of an orphaned action node.
+          attributes: { "ai.toolCall.name": "web_search", "ai.toolCall.args": body.task ?? "" },
         },
         async (span) => {
           await new Promise<void>((r) => setTimeout(r, 80));
           const output = "Found 3 relevant results.";
-          span.setAttribute("tool.output", output);
+          span.setAttribute("ai.toolCall.result", output);
           span.end();
           return output;
         },

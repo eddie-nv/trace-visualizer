@@ -34,6 +34,14 @@ const server = http.createServer(async (req, res) => {
       const body = JSON.parse(await readBody(req)) as { prompt?: string };
       const prompt = body.prompt ?? "hello";
 
+      // Capture the LLM span context INSIDE the withLLMCall callback, before
+      // the span ends. After withLLMCall() returns the span is over and
+      // context.active() reverts to the orchestrator span — injecting that
+      // would make tool.web_search a sibling of the LLM call instead of a
+      // child, so span-classifier would draw the arrow from orchestrator →
+      // web_search rather than claude-opus-4-8 → web_search.
+      let llmSpanContext = context.active();
+
       const llmResponse = await withLLMCall(
         { provider: "anthropic", operation: "chat" },
         async (span) => {
@@ -51,13 +59,15 @@ const server = http.createServer(async (req, res) => {
             finishReasons: ["end_turn"],
             messages: [{ role: "assistant", content: reply }],
           });
+          llmSpanContext = context.active(); // LLM span still active here
           return reply;
         },
       );
 
-      // Inject traceparent so agent-b joins the same trace.
+      // Inject the LLM span's context so tool.web_search becomes a child of
+      // the LLM call — the renderer then draws: claude-opus-4-8 → web_search.
       const outCarrier: Record<string, string> = {};
-      propagation.inject(context.active(), outCarrier);
+      propagation.inject(llmSpanContext, outCarrier);
 
       const toolResponse = await fetch("http://localhost:3003/tool", {
         method: "POST",
