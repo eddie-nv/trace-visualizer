@@ -1,10 +1,12 @@
 import { context, SpanKind, trace, type Span } from "@opentelemetry/api";
 import { ATTR } from "./attributes.js";
+import { captureCallerFrame } from "./caller-frame.js";
 import { shouldSendContent } from "./content-gating.js";
 import {
   applyUsage,
   formatSystemInstructions,
   recordSpanError,
+  setCallerAttributes,
   setStringAttribute,
 } from "./span-attrs.js";
 import { TRACER_NAME } from "./tracer.js";
@@ -76,6 +78,8 @@ export function withLLMCall<T>(
   attrs: LLMCallAttributes,
   fn: (span: LLMSpan) => T | Promise<T>,
 ): Promise<T> {
+  // Capture synchronously before any awaits so the stack still shows the call site.
+  const callerFrame = captureCallerFrame();
   validateCallAttributes(attrs);
   const tracer = trace.getTracer(TRACER_NAME);
   return tracer.startActiveSpan(
@@ -88,6 +92,7 @@ export function withLLMCall<T>(
       },
     },
     async (span) => {
+      setCallerAttributes(span, callerFrame);
       let isRequestReported = false;
       const llmSpan: LLMSpan = {
         reportRequest(req) {
