@@ -219,6 +219,42 @@ try {
     .find((id) => tracesByService.get("agent-a")?.has(id) && tracesByService.get("agent-b")?.has(id));
   assert(sharedTraceId !== undefined, "no single traceId shared across all 3 services");
 
+  // ── agentic loop span structure ──────────────────────────────────────────
+  // Expected span tree (agent-a emits both LLM turns):
+  //   orchestrator.run  (SERVER)
+  //     └─ chat claude-opus-4-8  (CLIENT, turn 1 — decides to search)
+  //          └─ tool.web_search  (INTERNAL — executes search)
+  //     └─ chat claude-opus-4-8  (CLIENT, turn 2 — incorporates result)
+
+  const traceSpans = collected.filter((e) => e.span.traceId === sharedTraceId);
+  const spanById = new Map(traceSpans.map((e) => [e.span.spanId, e.span]));
+
+  const chatSpans = traceSpans.filter((e) => e.span.name === "chat claude-opus-4-8");
+  assert(
+    chatSpans.length >= 2,
+    `expected ≥2 'chat claude-opus-4-8' spans (LLM turn 1 + turn 2), got ${chatSpans.length}`,
+  );
+
+  const toolSpanEntry = traceSpans.find((e) => e.span.name === "tool.web_search");
+  assert(toolSpanEntry !== undefined, "missing tool.web_search span");
+
+  const toolParentName = spanById.get(toolSpanEntry.span.parentSpanId ?? "")?.name;
+  assert(
+    toolParentName === "chat claude-opus-4-8",
+    `tool.web_search parent should be 'chat claude-opus-4-8', got '${toolParentName}'`,
+  );
+
+  const orchestratorSpanEntry = traceSpans.find((e) => e.span.name === "orchestrator.run");
+  assert(orchestratorSpanEntry !== undefined, "missing orchestrator.run span");
+
+  const chatChildrenOfOrchestrator = chatSpans.filter(
+    (e) => e.span.parentSpanId === orchestratorSpanEntry.span.spanId,
+  );
+  assert(
+    chatChildrenOfOrchestrator.length >= 2,
+    `expected ≥2 'chat claude-opus-4-8' direct children of orchestrator.run (LLM turn 1 + turn 2), got ${chatChildrenOfOrchestrator.length}`,
+  );
+
   // ── write traces.json ────────────────────────────────────────────────────
 
   const rootSpan = collected.find(

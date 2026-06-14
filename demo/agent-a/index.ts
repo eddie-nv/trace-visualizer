@@ -74,10 +74,41 @@ const server = http.createServer(async (req, res) => {
         headers: { "content-type": "application/json", ...outCarrier },
         body: JSON.stringify({ task: llmResponse }),
       });
-      const toolResult = (await toolResponse.json()) as unknown;
+      if (!toolResponse.ok) {
+        throw new Error(`agent-b returned HTTP ${toolResponse.status}`);
+      }
+      const toolResult = (await toolResponse.json()) as { ok: boolean; result?: string };
+
+      // LLM turn 2: ingest the tool result and produce a final answer.
+      // context.active() has reverted to parentContext (orchestrator.run span)
+      // so this span becomes a sibling of LLM turn 1, not a child.
+      const finalAnswer = await withLLMCall(
+        { provider: "anthropic", operation: "chat" },
+        async (span) => {
+          const after = span.reportRequest({
+            model: "claude-opus-4-8",
+            messages: [
+              { role: "user", content: prompt },
+              { role: "assistant", content: llmResponse },
+              { role: "user", content: `Tool result: ${toolResult.result ?? ""}` },
+            ],
+          });
+
+          await new Promise<void>((r) => setTimeout(r, 120));
+
+          const reply = `Based on the search results: ${toolResult.result ?? "no results"}`;
+          after.reportResponse({
+            model: "claude-opus-4-8",
+            usage: { inputTokens: 68, outputTokens: 32 },
+            finishReasons: ["end_turn"],
+            messages: [{ role: "assistant", content: reply }],
+          });
+          return reply;
+        },
+      );
 
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: true, response: llmResponse, tool: toolResult }));
+      res.end(JSON.stringify({ ok: true, response: finalAnswer, tool: toolResult }));
     } catch (err) {
       res.writeHead(500, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: false, error: String(err) }));
