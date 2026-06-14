@@ -1,6 +1,7 @@
 import type { HostToWebviewMessage } from "../webview/messages.js";
 import type { OtlpSpan } from "./otlp-types.js";
 import type { SpanEntry } from "./span-store.js";
+import type { InferredArrow, InferredActionNode } from "../../webview-src/store/view-model.js";
 
 interface MinimalWebviewPanel {
   webview: { postMessage(message: unknown): void };
@@ -11,6 +12,10 @@ export class Fanout {
   private ready = false;
   private buffer: HostToWebviewMessage[] = [];
   private activeTraceId: string | undefined = undefined;
+  private readonly inferredNodesByTrace = new Map<
+    string,
+    ReadonlyArray<InferredArrow | InferredActionNode>
+  >();
 
   setPanel(panel: MinimalWebviewPanel): void {
     this.panel = panel;
@@ -39,6 +44,15 @@ export class Fanout {
     this.enqueue({ command: "traceComplete", traceId });
   }
 
+  broadcastInferredNodes(
+    traceId: string,
+    nodes: ReadonlyArray<InferredArrow | InferredActionNode>,
+  ): void {
+    if (traceId !== this.activeTraceId) return;
+    this.inferredNodesByTrace.set(traceId, nodes);
+    this.enqueue({ command: "inferredNodes", traceId, nodes });
+  }
+
   /** Switch to a new active trace, clear any buffered messages, and send a full replay. */
   activateTrace(traceId: string, spans: ReadonlyArray<SpanEntry>, complete: boolean): void {
     this.activeTraceId = traceId;
@@ -46,6 +60,10 @@ export class Fanout {
     this.enqueue({ command: "initTrace", traceId, spans: [...spans] });
     if (complete) {
       this.enqueue({ command: "traceComplete", traceId });
+    }
+    const inferred = this.inferredNodesByTrace.get(traceId);
+    if (inferred !== undefined) {
+      this.enqueue({ command: "inferredNodes", traceId, nodes: inferred });
     }
   }
 

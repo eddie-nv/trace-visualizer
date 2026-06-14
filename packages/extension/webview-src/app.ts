@@ -107,6 +107,10 @@ window.addEventListener("message", (event: MessageEvent<HostToWebviewMessage>) =
       }
       break;
     }
+    case "inferredNodes": {
+      store.applyInferredNodes(msg.nodes);
+      break;
+    }
     case "themeChange": {
       // VS Code automatically updates its CSS variables in the webview on theme change.
       // Our --tv-* vars reference those directly, so no explicit action is needed.

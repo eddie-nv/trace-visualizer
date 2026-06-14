@@ -45,6 +45,11 @@
           "type": "string",
           "default": "",
           "description": "Optional Jaeger OTLP endpoint to forward spans to (e.g. http://localhost:4318). Leave empty to disable forwarding."
+        },
+        "agentgraph.enableLLMEnrichment": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable LLM-powered enrichment of traces with inferred decision nodes. Requires AGENTGRAPH_ANTHROPIC_KEY env var. Set AGENTGRAPH_TRACE_CONTENT=false to hard-disable."
         }
       }
     }
@@ -65,6 +70,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }

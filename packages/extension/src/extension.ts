@@ -7,12 +7,14 @@ import { registerCommands } from "./commands.js";
 import { TraceSidebarProvider } from "./webview/sidebar.js";
 import { getOrCreatePanel } from "./webview/panel.js";
 import { writeTraces } from "./mcp/ipc-store.js";
+import { EnrichmentEngine } from "./enrichment/index.js";
 
 let server: Server | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   const store = new SpanStore();
   const fanout = new Fanout();
+  const enrichmentEngine = new EnrichmentEngine();
 
   const config = vscode.workspace.getConfiguration("agentgraph");
   const port = config.get<number>("receiverPort") ?? 4319;
@@ -45,8 +47,9 @@ export function activate(context: vscode.ExtensionContext): void {
     onSpan: (traceId, span, serviceName) => {
       fanout.broadcastSpan(traceId, span, serviceName);
       const conv = store.getConversation(traceId);
-      if (conv?.complete) {
+      if (conv !== undefined && conv.complete) {
         fanout.broadcastTraceComplete(traceId);
+        void enrichmentEngine.enrich(conv, fanout, outputChannel);
       }
       sidebar.refresh();
       try {
