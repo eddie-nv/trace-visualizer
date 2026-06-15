@@ -51,11 +51,20 @@ function renderViewModel(vm: ViewModel): void {
     vscodeApi.postMessage({ command: "spanSelected", spanId });
   });
   renderSpanEvents(scene.arrows, vm.spanEvents, layout.columns, rowMap);
-  renderActionNodes(scene.nodes, vm.actionNodes, layout.columns, rowMap, (spanId) => {
-    const span = spanIndex.get(spanId);
-    showSpanDetail(span);
-    vscodeApi.postMessage({ command: "spanSelected", spanId });
-  });
+  renderActionNodes(
+    scene.nodes,
+    vm.actionNodes,
+    layout.columns,
+    rowMap,
+    (spanId) => {
+      const span = spanIndex.get(spanId);
+      showSpanDetail(span);
+      vscodeApi.postMessage({ command: "spanSelected", spanId });
+    },
+    (file, line) => {
+      vscodeApi.postMessage({ command: "openFile", file, line, fn: undefined });
+    },
+  );
   renderFragments(scene.fragments, vm.fragments, layout.columns, rowMap);
 }
 
