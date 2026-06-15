@@ -241,4 +241,19 @@ describe("withLLMCall", () => {
     expect(span.attributes[ATTR.USAGE_CACHE_CREATION_INPUT_TOKENS]).toBeUndefined();
     expect(span.attributes[ATTR.USAGE_CACHE_READ_INPUT_TOKENS]).toBeUndefined();
   });
+
+  it("stamps code.* caller attributes from the call site", async () => {
+    await withLLMCall(CHAT_ATTRS, (span) => {
+      span.reportRequest(REQUEST);
+      return undefined;
+    });
+
+    const span = getSingleFinishedSpan();
+    expect(typeof span.attributes[ATTR.CODE_FILE]).toBe("string");
+    expect(typeof span.attributes[ATTR.CODE_LINE]).toBe("number");
+    expect(typeof span.attributes[ATTR.CODE_FUNCTION]).toBe("string");
+    // The file must not point at an agentgraph internal.
+    expect(String(span.attributes[ATTR.CODE_FILE])).not.toMatch(/\/packages\/core\//);
+    expect(String(span.attributes[ATTR.CODE_FILE])).not.toMatch(/@agentgraph\//);
+  });
 });

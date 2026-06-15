@@ -66,7 +66,12 @@ function buildPanelHTML(span: OtlpSpan): string {
     ?.stringValue;
   const model = attrs.find((a) => a.key === "gen_ai.request.model")?.value?.stringValue;
 
-  const durationMs = (BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano)) / 1_000_000n;
+  let durationMs: bigint | undefined;
+  try {
+    durationMs = (BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano)) / 1_000_000n;
+  } catch {
+    durationMs = undefined;
+  }
 
   const openFileBtn =
     file !== undefined && line !== undefined
@@ -91,7 +96,7 @@ function buildPanelHTML(span: OtlpSpan): string {
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:11px">
       ${model !== undefined ? `<tr><td style="color:var(--tv-text-muted);padding:2px 4px">model</td><td style="padding:2px 4px">${escapeHtml(model)}</td></tr>` : ""}
-      <tr><td style="color:var(--tv-text-muted);padding:2px 4px">duration</td><td style="padding:2px 4px">${durationMs}ms</td></tr>
+      ${durationMs !== undefined ? `<tr><td style="color:var(--tv-text-muted);padding:2px 4px">duration</td><td style="padding:2px 4px">${durationMs}ms</td></tr>` : ""}
       ${tokenRow}
       ${finishReasons !== undefined ? `<tr><td style="color:var(--tv-text-muted);padding:2px 4px">finish</td><td style="padding:2px 4px">${escapeHtml(finishReasons.replace(/["\[\]]/g, ""))}</td></tr>` : ""}
       ${file !== undefined ? `<tr><td style="color:var(--tv-text-muted);padding:2px 4px">file</td><td style="padding:2px 4px;word-break:break-all">${escapeHtml(file)}${line !== undefined ? `:${line}` : ""}</td></tr>` : ""}
@@ -105,5 +110,5 @@ function escapeHtml(s: string): string {
 }
 
 function escapeAttr(s: string): string {
-  return s.replace(/"/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

@@ -255,6 +255,24 @@ try {
     `expected ≥2 'chat claude-opus-4-8' direct children of orchestrator.run (LLM turn 1 + turn 2), got ${chatChildrenOfOrchestrator.length}`,
   );
 
+  // ── code.* attribute round-trip ─────────────────────────────────────────
+  // withLLMCall now stamps caller attributes. Verify they survive the OTLP
+  // round-trip so the detail panel "Open in editor" button can appear.
+  const llmSpanWithCode = chatSpans.find((e) => {
+    const attrs = e.span.attributes ?? [];
+    return attrs.some((a) => a.key === "code.file.path");
+  });
+  assert(
+    llmSpanWithCode !== undefined,
+    "no 'chat claude-opus-4-8' span carries a code.file.path attribute — caller frame not stamped or not exported",
+  );
+  const codeFile = llmSpanWithCode.span.attributes?.find((a) => a.key === "code.file.path")
+    ?.value.stringValue;
+  assert(
+    codeFile !== undefined && codeFile.includes("agent-a"),
+    `code.file.path should point to agent-a, got: ${codeFile}`,
+  );
+
   // ── write traces.json ────────────────────────────────────────────────────
 
   const rootSpan = collected.find(
