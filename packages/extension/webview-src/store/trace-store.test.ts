@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { TraceStore } from "./trace-store.js";
 import type { OtlpSpan } from "../../src/receiver/otlp-types.js";
+import type { InferredArrow, InferredActionNode } from "./view-model.js";
 
 function makeSpan(spanId: string, traceId = "t1", parentSpanId?: string): OtlpSpan {
   return {
@@ -110,5 +111,91 @@ describe("TraceStore", () => {
 
     const lastVm = listener.mock.calls[listener.mock.calls.length - 1][0];
     expect(lastVm.actionNodes).toHaveLength(2);
+  });
+
+  it("applyInferredNodes notifies subscribers", () => {
+    const store = new TraceStore();
+    const listener = vi.fn();
+    store.subscribe(listener);
+    store.setActiveTrace("t1", []);
+    listener.mockClear();
+
+    store.applyInferredNodes([]);
+
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it("applyInferredNodes merges inferred arrows into getViewModel result", () => {
+    const store = new TraceStore();
+    store.setActiveTrace("t1", []);
+
+    const inferredArrow: InferredArrow = {
+      kind: "inferred",
+      id: "i1",
+      fromParticipantId: "svc-a",
+      toParticipantId: "svc-b",
+      style: "solid",
+      label: "call",
+      timeNs: "1000",
+      codePointer: { file: "f.ts", line: 1 },
+      reasoning: "r",
+    };
+
+    store.applyInferredNodes([inferredArrow]);
+
+    const vm = store.getViewModel();
+    expect(vm.arrows.some((a) => a.kind === "inferred")).toBe(true);
+  });
+
+  it("applyInferredNodes merges inferred action nodes into getViewModel result", () => {
+    const store = new TraceStore();
+    store.setActiveTrace("t1", []);
+
+    const inferredAction: InferredActionNode = {
+      kind: "inferred",
+      id: "i1",
+      participantId: "svc-a",
+      label: "process",
+      timeNs: "1000",
+      codePointer: { file: "agent.ts", line: 5 },
+      reasoning: "logic",
+    };
+
+    store.applyInferredNodes([inferredAction]);
+
+    const vm = store.getViewModel();
+    expect(vm.actionNodes.some((n) => n.kind === "inferred")).toBe(true);
+  });
+
+  it("setActiveTrace resets inferred nodes from previous trace", () => {
+    const store = new TraceStore();
+    store.setActiveTrace("t1", []);
+
+    const inferredArrow: InferredArrow = {
+      kind: "inferred",
+      id: "i1",
+      fromParticipantId: "svc-a",
+      toParticipantId: "svc-b",
+      style: "solid",
+      label: "call",
+      timeNs: "1000",
+      codePointer: { file: "f.ts", line: 1 },
+      reasoning: "r",
+    };
+    store.applyInferredNodes([inferredArrow]);
+
+    store.setActiveTrace("t2", []);
+
+    const vm = store.getViewModel();
+    expect(vm.arrows.filter((a) => a.kind === "inferred")).toHaveLength(0);
+  });
+
+  it("getViewModel returns base ViewModel when no inferred nodes applied", () => {
+    const store = new TraceStore();
+    store.setActiveTrace("t1", []);
+
+    const vm = store.getViewModel();
+    expect(vm.arrows).toHaveLength(0);
+    expect(vm.actionNodes).toHaveLength(0);
   });
 });

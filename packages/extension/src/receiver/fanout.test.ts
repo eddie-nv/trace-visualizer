@@ -168,4 +168,59 @@ describe("Fanout", () => {
       expect.objectContaining({ command: "appendSpan", traceId: "t2" }),
     );
   });
+
+  it("broadcastInferredNodes sends inferredNodes message for active trace", () => {
+    fanout.setPanel({ webview: { postMessage } } as never);
+    fanout.onWebviewReady();
+
+    fanout.broadcastSpan("t1", makeSpan("s1"), "svc");
+    const nodes = [{ kind: "inferred", id: "i1" }];
+    fanout.broadcastInferredNodes("t1", nodes as never);
+
+    expect(postMessage).toHaveBeenCalledWith({
+      command: "inferredNodes",
+      traceId: "t1",
+      nodes,
+    });
+  });
+
+  it("broadcastInferredNodes drops message for non-active trace", () => {
+    fanout.setPanel({ webview: { postMessage } } as never);
+    fanout.onWebviewReady();
+
+    fanout.broadcastSpan("t1", makeSpan("s1"), "svc"); // activates t1
+    postMessage.mockClear();
+
+    fanout.broadcastInferredNodes("t2", [] as never); // t2 not active
+
+    expect(postMessage).not.toHaveBeenCalled();
+  });
+
+  it("activateTrace replays cached inferredNodes when they exist", () => {
+    fanout.setPanel({ webview: { postMessage } } as never);
+    fanout.onWebviewReady();
+
+    fanout.broadcastSpan("t1", makeSpan("s1"), "svc");
+    const nodes = [{ kind: "inferred", id: "i1" }];
+    fanout.broadcastInferredNodes("t1", nodes as never);
+    postMessage.mockClear();
+
+    fanout.activateTrace("t1", [], true); // re-select same trace
+
+    const commands = postMessage.mock.calls.map((c) => (c[0] as { command: string }).command);
+    expect(commands).toContain("inferredNodes");
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "inferredNodes", traceId: "t1", nodes }),
+    );
+  });
+
+  it("activateTrace does not send inferredNodes when none have been received", () => {
+    fanout.setPanel({ webview: { postMessage } } as never);
+    fanout.onWebviewReady();
+
+    fanout.activateTrace("t1", [], true);
+
+    const commands = postMessage.mock.calls.map((c) => (c[0] as { command: string }).command);
+    expect(commands).not.toContain("inferredNodes");
+  });
 });

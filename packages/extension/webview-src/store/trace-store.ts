@@ -1,6 +1,6 @@
 import type { OtlpSpan } from "../../src/receiver/otlp-types.js";
 import { spansToViewModel, type SpanEntry } from "./span-classifier.js";
-import type { ViewModel } from "./view-model.js";
+import type { InferredArrow, InferredActionNode, ViewModel } from "./view-model.js";
 
 export type TraceStoreListener = (vm: ViewModel) => void;
 
@@ -8,6 +8,7 @@ export class TraceStore {
   private entries: SpanEntry[] = [];
   private currentTraceId: string | undefined = undefined;
   private listeners: TraceStoreListener[] = [];
+  private inferred: ReadonlyArray<InferredArrow | InferredActionNode> = [];
 
   setActiveTrace(
     traceId: string,
@@ -15,6 +16,12 @@ export class TraceStore {
   ): void {
     this.currentTraceId = traceId;
     this.entries = [...spans];
+    this.inferred = [];
+    this.notify();
+  }
+
+  applyInferredNodes(nodes: ReadonlyArray<InferredArrow | InferredActionNode>): void {
+    this.inferred = nodes;
     this.notify();
   }
 
@@ -25,7 +32,19 @@ export class TraceStore {
   }
 
   getViewModel(): ViewModel {
-    return spansToViewModel(this.entries);
+    const base = spansToViewModel(this.entries);
+    if (this.inferred.length === 0) return base;
+    const inferredArrows = this.inferred.filter(
+      (n): n is InferredArrow => "fromParticipantId" in n,
+    );
+    const inferredActions = this.inferred.filter(
+      (n): n is InferredActionNode => !("fromParticipantId" in n),
+    );
+    return {
+      ...base,
+      arrows: [...base.arrows, ...inferredArrows],
+      actionNodes: [...base.actionNodes, ...inferredActions],
+    };
   }
 
   subscribe(listener: TraceStoreListener): () => void {
