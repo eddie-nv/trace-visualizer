@@ -147,6 +147,7 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
       }
 
       arrows.push({
+        kind: "observed",
         id: `${span.spanId}-req`,
         fromParticipantId: sourceParticipant.id,
         toParticipantId: targetParticipant.id,
@@ -157,6 +158,7 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
       });
 
       arrows.push({
+        kind: "observed",
         id: `${span.spanId}-ret`,
         fromParticipantId: targetParticipant.id,
         toParticipantId: sourceParticipant.id,
@@ -178,6 +180,7 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
     } else {
       ensureParticipant(targetParticipant);
       actionNodes.push({
+        kind: "observed",
         id: span.spanId,
         participantId: targetParticipant.id,
         label: span.name,
