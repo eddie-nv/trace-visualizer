@@ -1,4 +1,4 @@
-import type { ActionNode } from "../store/view-model.js";
+import type { ActionNode, InferredActionNode } from "../store/view-model.js";
 import type { ColumnLayout, RowLayout } from "../layout/swimlane.js";
 import { colorFromString } from "./color.js";
 
@@ -12,6 +12,7 @@ const nodeElements = new Map<string, SVGGElement>();
 
 type SpanSelectedCallback = (spanId: string) => void;
 type CodePointerCallback = (file: string, line: number) => void;
+type InferredSelectedCallback = (node: InferredActionNode) => void;
 
 export function renderActionNodes(
   nodesG: SVGGElement,
@@ -20,6 +21,7 @@ export function renderActionNodes(
   rowMap: ReadonlyMap<string, RowLayout>,
   onSpanSelected: SpanSelectedCallback,
   onCodePointerClick?: CodePointerCallback,
+  onInferredSelected?: InferredSelectedCallback,
 ): void {
   for (const node of actionNodes) {
     if (nodeElements.has(node.id)) continue;
@@ -100,6 +102,9 @@ export function renderActionNodes(
       });
 
       g.appendChild(badgeG);
+
+      g.style.cursor = "pointer";
+      g.addEventListener("click", () => onInferredSelected?.(node));
     } else {
       g.setAttribute("class", "ag-action-node");
       g.dataset["spanId"] = node.spanId;

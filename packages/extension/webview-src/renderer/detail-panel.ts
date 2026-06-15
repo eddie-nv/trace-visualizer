@@ -1,4 +1,5 @@
 import type { OtlpSpan } from "../../src/receiver/otlp-types.js";
+import type { InferredActionNode, InferredArrow } from "../store/view-model.js";
 
 type OpenFileCallback = (file: string, line: number, fn?: string) => void;
 
@@ -53,6 +54,27 @@ export function hideDetail(): void {
   if (panelEl !== null) panelEl.style.display = "none";
 }
 
+export function showInferredDetail(
+  node: InferredActionNode | InferredArrow,
+  accentColor: string,
+): void {
+  if (panelEl === null) return;
+  panelEl.style.display = "block";
+  panelEl.innerHTML = buildInferredPanelHTML(node, accentColor);
+
+  const openBtn = panelEl.querySelector<HTMLButtonElement>("#ag-open-file-btn");
+  if (openBtn !== null && onOpenFile !== null) {
+    const file = openBtn.dataset["file"];
+    const line = Number(openBtn.dataset["line"]);
+    if (file !== undefined && !Number.isNaN(line)) {
+      openBtn.addEventListener("click", () => onOpenFile!(file, line, undefined));
+    }
+  }
+
+  const closeBtn = panelEl.querySelector<HTMLButtonElement>("#ag-panel-close");
+  closeBtn?.addEventListener("click", hideDetail);
+}
+
 function buildPanelHTML(span: OtlpSpan): string {
   const attrs = span.attributes ?? [];
   const file = attrs.find((a) => a.key === "code.file.path")?.value?.stringValue;
@@ -102,6 +124,38 @@ function buildPanelHTML(span: OtlpSpan): string {
       ${file !== undefined ? `<tr><td style="color:var(--tv-text-muted);padding:2px 4px">file</td><td style="padding:2px 4px;word-break:break-all">${escapeHtml(file)}${line !== undefined ? `:${line}` : ""}</td></tr>` : ""}
     </table>
     ${openFileBtn}
+  `;
+}
+
+function buildInferredPanelHTML(node: InferredActionNode | InferredArrow, accentColor: string): string {
+  const { file, line, snippet } = node.codePointer;
+  const fileDisplay = `${file.split("/").pop() ?? file}:${line}`;
+
+  const snippetSection =
+    snippet !== undefined
+      ? `<pre style="margin:8px 0;padding:6px;background:var(--tv-surface-alt,#1e1e1e);border-radius:3px;font-size:10px;overflow-x:auto;color:var(--tv-text)">${escapeHtml(snippet)}</pre>`
+      : "";
+
+  return `
+    <div id="ag-inferred-header" style="margin:-12px -12px 12px;padding:10px 12px;background:${escapeAttr(accentColor)};color:#fff;display:flex;justify-content:space-between;align-items:center">
+      <strong style="font-size:13px">${escapeHtml(node.label)}</strong>
+      <button id="ag-panel-close" style="background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;font-size:16px;padding:0 4px">×</button>
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="color:var(--tv-text-muted);font-size:10px;text-transform:uppercase;margin-bottom:4px">Reasoning</div>
+      <div style="font-size:11px">${escapeHtml(node.reasoning)}</div>
+    </div>
+    <div style="margin-bottom:4px">
+      <div style="color:var(--tv-text-muted);font-size:10px;text-transform:uppercase;margin-bottom:2px">Code</div>
+      <div style="font-size:11px;word-break:break-all">${escapeHtml(fileDisplay)}</div>
+    </div>
+    ${snippetSection}
+    <button id="ag-open-file-btn"
+      data-file="${escapeAttr(file)}"
+      data-line="${line}"
+      style="margin-top:8px;padding:4px 8px;background:${escapeAttr(accentColor)};color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:11px;">
+      Open in editor
+    </button>
   `;
 }
 

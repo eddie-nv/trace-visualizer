@@ -10,7 +10,8 @@ import { renderColumns, renderFooterColumns, clearColumns } from "./renderer/col
 import { renderArrows, renderSpanEvents, clearArrows } from "./renderer/arrows.js";
 import { renderActionNodes, clearActionNodes } from "./renderer/action-nodes.js";
 import { renderFragments, clearFragments } from "./renderer/fragments.js";
-import { initDetailPanel, showSpanDetail, hideDetail } from "./renderer/detail-panel.js";
+import { initDetailPanel, showSpanDetail, showInferredDetail, hideDetail } from "./renderer/detail-panel.js";
+import { colorFromString } from "./renderer/color.js";
 
 declare const acquireVsCodeApi: () => {
   postMessage(msg: WebviewToHostMessage): void;
@@ -45,11 +46,20 @@ function renderViewModel(vm: ViewModel): void {
   const rowMap = buildRowMap(layout);
 
   renderColumns(scene.lifelines, vm.participants, layout.columns, layout.totalHeight);
-  renderArrows(scene.arrows, vm.arrows, layout.columns, rowMap, (spanId) => {
-    const span = spanIndex.get(spanId);
-    showSpanDetail(span);
-    vscodeApi.postMessage({ command: "spanSelected", spanId });
-  });
+  renderArrows(
+    scene.arrows,
+    vm.arrows,
+    layout.columns,
+    rowMap,
+    (spanId) => {
+      const span = spanIndex.get(spanId);
+      showSpanDetail(span);
+      vscodeApi.postMessage({ command: "spanSelected", spanId });
+    },
+    (arrow) => {
+      showInferredDetail(arrow, colorFromString(arrow.fromParticipantId, 65, 35));
+    },
+  );
   renderSpanEvents(scene.arrows, vm.spanEvents, layout.columns, rowMap);
   renderActionNodes(
     scene.nodes,
@@ -63,6 +73,9 @@ function renderViewModel(vm: ViewModel): void {
     },
     (file, line) => {
       vscodeApi.postMessage({ command: "openFile", file, line, fn: undefined });
+    },
+    (node) => {
+      showInferredDetail(node, colorFromString(node.participantId, 65, 35));
     },
   );
   renderFragments(scene.fragments, vm.fragments, layout.columns, rowMap);

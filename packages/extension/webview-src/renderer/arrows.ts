@@ -1,4 +1,4 @@
-import type { Arrow, SpanEvent } from "../store/view-model.js";
+import type { Arrow, InferredArrow, SpanEvent } from "../store/view-model.js";
 import type { ColumnLayout, RowLayout } from "../layout/swimlane.js";
 import { colorFromString } from "./color.js";
 
@@ -35,6 +35,7 @@ function ensureInferredMarker(svg: SVGSVGElement, participantId: string): string
 }
 
 type SpanSelectedCallback = (spanId: string) => void;
+type InferredSelectedCallback = (arrow: InferredArrow) => void;
 
 export function renderArrows(
   arrowsG: SVGGElement,
@@ -42,6 +43,7 @@ export function renderArrows(
   columns: ReadonlyMap<string, ColumnLayout>,
   rowMap: ReadonlyMap<string, RowLayout>,
   onSpanSelected: SpanSelectedCallback,
+  onInferredSelected?: InferredSelectedCallback,
 ): void {
   for (const arrow of arrows) {
     if (arrowElements.has(arrow.id)) continue;
@@ -96,6 +98,9 @@ export function renderArrows(
       g.appendChild(line);
       g.appendChild(hitLine);
       g.appendChild(text);
+
+      g.style.cursor = "pointer";
+      g.addEventListener("click", () => onInferredSelected?.(arrow));
     } else {
       const isDashed = arrow.style === "dashed";
       g.setAttribute("class", `ag-arrow ${isDashed ? "ag-arrow-dashed" : "ag-arrow-solid"}`);
