@@ -1,0 +1,4 @@
+**
+!dist/**
+!webview-src/app.html
+!package.json

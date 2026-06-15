@@ -129,4 +129,63 @@ describe("SpanStore", () => {
     expect(store.getConversation("t1")?.traceId).toBe("t1");
     expect(store.getConversation("missing")).toBeUndefined();
   });
+
+  // ── regression: 3 services same traceId = 1 trace entry ─────────────────────
+
+  it("three services with the same traceId produce exactly one trace entry", () => {
+    const traceId = "aabbccdd11223344aabbccdd11223344";
+    // Simulate demo: agent-a and agent-b arrive first (children), orchestrator last (root)
+    store.addSpan(
+      makeResourceSpan("agent-a"),
+      makeSpan({ traceId, spanId: "s-a", name: "chat", parentSpanId: "s-orch" }),
+    );
+    store.addSpan(
+      makeResourceSpan("agent-b"),
+      makeSpan({ traceId, spanId: "s-b", name: "tool.web_search", parentSpanId: "s-orch" }),
+    );
+    store.addSpan(
+      makeResourceSpan("orchestrator"),
+      makeSpan({ traceId, spanId: "s-orch", name: "orchestrator.run" }),
+    );
+
+    const convs = store.getConversations();
+    expect(convs).toHaveLength(1);
+    expect(convs[0]?.traceId).toBe(traceId);
+    expect(convs[0]?.servicesSeen.size).toBe(3);
+    expect(convs[0]?.spans).toHaveLength(3);
+    expect(convs[0]?.complete).toBe(true);
+    expect(convs[0]?.rootSpan?.name).toBe("orchestrator.run");
+  });
+
+  // ── regression: duplicate span (OTLP retry) must not create two trace entries
+
+  it("receiving the same span twice stores it only once", () => {
+    const traceId = "dupe0000dupe0000dupe0000dupe0000";
+    const span = makeSpan({ traceId, spanId: "s1", name: "op", parentSpanId: "parent" });
+    const resource = makeResourceSpan("svc");
+
+    store.addSpan(resource, span);
+    store.addSpan(resource, span); // duplicate — simulates OTLP retry
+
+    const convs = store.getConversations();
+    expect(convs).toHaveLength(1);
+    expect(convs[0]?.spans).toHaveLength(1);
+  });
+
+  it("duplicate root span does not mark incomplete trace complete twice", () => {
+    const traceId = "root0000root0000root0000root0000";
+    const resource = makeResourceSpan("svc");
+    // child arrives first
+    store.addSpan(resource, makeSpan({ traceId, spanId: "child", name: "child-op", parentSpanId: "root" }));
+    // root arrives
+    const root = makeSpan({ traceId, spanId: "root", name: "root-op" });
+    store.addSpan(resource, root);
+    // root arrives again (retry)
+    store.addSpan(resource, root);
+
+    const convs = store.getConversations();
+    expect(convs).toHaveLength(1);
+    expect(convs[0]?.spans).toHaveLength(2); // child + root, not child + root + root
+    expect(convs[0]?.complete).toBe(true);
+  });
 });

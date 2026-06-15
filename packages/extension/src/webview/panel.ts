@@ -76,8 +76,8 @@ function buildHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AgentGraph</title>
   <style>
-    body { margin: 0; padding: 0; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); font-family: var(--vscode-font-family); }
-    #diagram { padding: 8px; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); font-family: var(--vscode-font-family); }
+    #diagram { width: 100%; height: 100%; padding: 8px; box-sizing: border-box; }
   </style>
 </head>
 <body>
