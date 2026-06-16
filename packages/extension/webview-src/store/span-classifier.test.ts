@@ -162,7 +162,7 @@ describe("spansToViewModel — participant classification", () => {
     expect(vm.participants[0]?.type).toBe("service");
   });
 
-  it("uses gen_ai.provider.name over gen_ai.system for model participant id", () => {
+  it("LLM span with gen_ai attributes becomes a service action node, not a model participant", () => {
     const span: OtlpSpan = {
       traceId: "abc",
       spanId: "s1",
@@ -189,8 +189,9 @@ describe("spansToViewModel — participant classification", () => {
       { span: parent, serviceName: "svc" },
       { span, serviceName: "svc" },
     ]);
-    const modelParticipant = vm.participants.find((p) => p.type === "model");
-    expect(modelParticipant?.id).toBe("openai:gpt-4o");
+    expect(vm.participants).toHaveLength(1);
+    expect(vm.participants[0]?.type).toBe("service");
+    expect(vm.participants.find((p) => p.type === "model")).toBeUndefined();
   });
 });
 
@@ -206,7 +207,18 @@ describe("spansToViewModel — origin tagging", () => {
   });
 
   it("observed arrow carries spanId", () => {
-    const vm = spansToViewModel(ALL_ENTRIES);
+    const parent: OtlpSpan = {
+      traceId: "abc", spanId: "p1", name: "root",
+      startTimeUnixNano: "1000", endTimeUnixNano: "5000",
+    };
+    const child: OtlpSpan = {
+      traceId: "abc", spanId: "c1", parentSpanId: "p1", name: "worker",
+      startTimeUnixNano: "1100", endTimeUnixNano: "4900",
+    };
+    const vm = spansToViewModel([
+      { span: parent, serviceName: "svc-a" },
+      { span: child, serviceName: "svc-b" },
+    ]);
     const first = vm.arrows[0];
     expect(first?.kind).toBe("observed");
     if (first === undefined || first.kind !== "observed") throw new Error("expected observed arrow");
