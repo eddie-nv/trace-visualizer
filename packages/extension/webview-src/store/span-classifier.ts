@@ -47,6 +47,12 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
 
   const spanMap = new Map<string, SpanEntry>(entries.map((e) => [e.span.spanId, e]));
 
+  // Sort by start time so participants are registered in call order regardless
+  // of OTLP arrival order (spans export on completion — inner spans arrive first).
+  const sorted = [...entries].sort((a, b) =>
+    compareNs(a.span.startTimeUnixNano, b.span.startTimeUnixNano),
+  );
+
   const participantMap = new Map<string, Participant>();
   const arrows: Arrow[] = [];
   const actionNodes: ActionNode[] = [];
@@ -61,7 +67,7 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
     }
   }
 
-  for (const { span, serviceName } of entries) {
+  for (const { span, serviceName } of sorted) {
     const targetParticipant = resolveParticipant(span, serviceName);
     const parentEntry =
       span.parentSpanId !== undefined ? spanMap.get(span.parentSpanId) : undefined;

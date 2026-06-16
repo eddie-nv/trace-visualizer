@@ -520,4 +520,14 @@ describe("spansToViewModel — service-topology: multi-service demo trace", () =
     expect(frag?.memberSpanIds).toContain("c1");
     expect(frag?.memberSpanIds).toContain("c2");
   });
+
+  it("preserves participant column order by start time regardless of OTLP arrival order", () => {
+    // In production, spans arrive in completion order (innermost first).
+    // Participant order must still reflect the span-start hierarchy, not arrival order.
+    const reversed = [...DEMO_ENTRIES].reverse();
+    const vm = spansToViewModel(reversed);
+    expect(vm.participants[0]?.id).toBe("orchestrator");
+    expect(vm.participants[1]?.id).toBe("agent-a");
+    expect(vm.participants[2]?.id).toBe("agent-b");
+  });
 });
