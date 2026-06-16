@@ -30,32 +30,34 @@ const server = http.createServer(async (req, res) => {
   const parentContext = propagation.extract(ROOT_CONTEXT, carrier);
 
   await context.with(parentContext, async () => {
-    try {
-      const body = JSON.parse(await readBody(req)) as { task?: string };
+    await tracer.startActiveSpan("agent-b.tool", { kind: SpanKind.SERVER }, async (agentBSpan) => {
+      try {
+        const body = JSON.parse(await readBody(req)) as { task?: string };
 
-      const result = await tracer.startActiveSpan(
-        "tool.web_search",
-        {
-          kind: SpanKind.INTERNAL,
-          // ai.toolCall.* keys are required for span-classifier.ts#isToolSpan()
-          // to draw request/response arrows instead of an orphaned action node.
-          attributes: { "ai.toolCall.name": "web_search", "ai.toolCall.args": body.task ?? "" },
-        },
-        async (span) => {
-          await new Promise<void>((r) => setTimeout(r, 80));
-          const output = "Found 3 relevant results.";
-          span.setAttribute("ai.toolCall.result", output);
-          span.end();
-          return output;
-        },
-      );
+        const result = await tracer.startActiveSpan(
+          "tool.web_search",
+          {
+            kind: SpanKind.INTERNAL,
+            attributes: { "ai.toolCall.name": "web_search", "ai.toolCall.args": body.task ?? "" },
+          },
+          async (span) => {
+            await new Promise<void>((r) => setTimeout(r, 80));
+            const output = "Found 3 relevant results.";
+            span.setAttribute("ai.toolCall.result", output);
+            span.end();
+            return output;
+          },
+        );
 
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: true, result }));
-    } catch (err) {
-      res.writeHead(500, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: false, error: String(err) }));
-    }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, result }));
+      } catch (err) {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: String(err) }));
+      } finally {
+        agentBSpan.end();
+      }
+    });
   });
 });
 

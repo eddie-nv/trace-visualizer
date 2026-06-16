@@ -17,42 +17,7 @@ function getStr(span: OtlpSpan, key: string): string | undefined {
   return span.attributes?.find((a) => a.key === key)?.value?.stringValue;
 }
 
-function getNum(span: OtlpSpan, key: string): number | undefined {
-  const attr = span.attributes?.find((a) => a.key === key);
-  if (!attr) return undefined;
-  const v = attr.value.intValue ?? attr.value.doubleValue;
-  return v !== undefined ? Number(v) : undefined;
-}
-
-function isLlmSpan(span: OtlpSpan): boolean {
-  const model = getStr(span, "gen_ai.request.model");
-  const inputTokens = getNum(span, "gen_ai.usage.input_tokens");
-  const outputTokens = getNum(span, "gen_ai.usage.output_tokens");
-  return model !== undefined && (inputTokens !== undefined || outputTokens !== undefined);
-}
-
-function isToolSpan(span: OtlpSpan): boolean {
-  return getStr(span, "ai.toolCall.name") !== undefined;
-}
-
 function resolveParticipant(span: OtlpSpan, serviceName: string): Participant {
-  const toolName = getStr(span, "ai.toolCall.name");
-  if (toolName !== undefined) {
-    return { id: toolName, label: toolName, type: "tool" };
-  }
-
-  if (isLlmSpan(span)) {
-    const model = getStr(span, "gen_ai.request.model") ?? "unknown";
-    const provider =
-      getStr(span, "gen_ai.provider.name") ??
-      getStr(span, "gen_ai.system") ??
-      getStr(span, "ai.model.provider") ??
-      "unknown";
-    const id = `${provider}:${model}`;
-    const label = model;
-    return { id, label, type: "model" };
-  }
-
   const agentId = getStr(span, "agentgraph.agent.id");
   if (agentId !== undefined) {
     return { id: agentId, label: agentId, type: "agent" };
@@ -70,20 +35,6 @@ function resolveParticipant(span: OtlpSpan, serviceName: string): Participant {
   return { id: serviceName, label: serviceName, type: "service" };
 }
 
-function resolveSourceParticipant(
-  span: OtlpSpan,
-  spanMap: Map<string, SpanEntry>,
-  serviceName: string,
-): Participant {
-  if (span.parentSpanId !== undefined) {
-    const parentEntry = spanMap.get(span.parentSpanId);
-    if (parentEntry !== undefined) {
-      return resolveParticipant(parentEntry.span, parentEntry.serviceName);
-    }
-  }
-  return resolveParticipant(span, serviceName);
-}
-
 function compareNs(a: string, b: string): number {
   if (a.length !== b.length) return a.length - b.length;
   return a < b ? -1 : a > b ? 1 : 0;
@@ -95,6 +46,12 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
   }
 
   const spanMap = new Map<string, SpanEntry>(entries.map((e) => [e.span.spanId, e]));
+
+  // Sort by start time so participants are registered in call order regardless
+  // of OTLP arrival order (spans export on completion — inner spans arrive first).
+  const sorted = [...entries].sort((a, b) =>
+    compareNs(a.span.startTimeUnixNano, b.span.startTimeUnixNano),
+  );
 
   const participantMap = new Map<string, Participant>();
   const arrows: Arrow[] = [];
@@ -110,41 +67,29 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
     }
   }
 
-  for (const { span, serviceName } of entries) {
+  for (const { span, serviceName } of sorted) {
     const targetParticipant = resolveParticipant(span, serviceName);
-    const isCrossService = isLlmSpan(span) || isToolSpan(span);
+    const parentEntry =
+      span.parentSpanId !== undefined ? spanMap.get(span.parentSpanId) : undefined;
 
-    if (isCrossService && span.parentSpanId !== undefined) {
-      const sourceParticipant = resolveSourceParticipant(span, spanMap, serviceName);
+    if (parentEntry !== undefined && parentEntry.serviceName !== serviceName) {
+      const sourceParticipant = resolveParticipant(parentEntry.span, parentEntry.serviceName);
+      // Skip cross-service arrows when both sides resolve to the same participant
+      // (e.g. same agentgraph.agent.id spanning two service names).
+      if (sourceParticipant.id === targetParticipant.id) {
+        ensureParticipant(targetParticipant);
+        actionNodes.push({
+          kind: "observed",
+          id: span.spanId,
+          participantId: targetParticipant.id,
+          label: span.name,
+          timeNs: span.startTimeUnixNano,
+          spanId: span.spanId,
+        });
+        continue;
+      }
       ensureParticipant(sourceParticipant);
       ensureParticipant(targetParticipant);
-
-      const finishReasons = getStr(span, "gen_ai.response.finish_reasons");
-      const inputTokens = getNum(span, "gen_ai.usage.input_tokens");
-      const outputTokens = getNum(span, "gen_ai.usage.output_tokens");
-      const toolName = getStr(span, "ai.toolCall.name");
-      const toolArgs = getStr(span, "ai.toolCall.args");
-      const toolResult = getStr(span, "ai.toolCall.result");
-
-      let requestLabel: string;
-      let returnLabel: string;
-
-      if (toolName !== undefined) {
-        const args = toolArgs !== undefined ? `(${toolArgs})` : "";
-        requestLabel = `${toolName}${args}`;
-        returnLabel = toolResult ?? "done";
-      } else {
-        const roundNum =
-          arrows.filter((a) => a.style === "solid" && a.toParticipantId === targetParticipant.id)
-            .length + 1;
-        requestLabel = `chat (round ${roundNum})`;
-        const reasons = finishReasons ?? "";
-        const usage =
-          inputTokens !== undefined && outputTokens !== undefined
-            ? ` · ${inputTokens} in / ${outputTokens} out`
-            : "";
-        returnLabel = `finish=${reasons.replace(/["\[\]]/g, "")}${usage}`;
-      }
 
       arrows.push({
         kind: "observed",
@@ -152,18 +97,19 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
         fromParticipantId: sourceParticipant.id,
         toParticipantId: targetParticipant.id,
         style: "solid",
-        label: requestLabel,
+        label: span.name,
         timeNs: span.startTimeUnixNano,
         spanId: span.spanId,
       });
 
+      // endTimeUnixNano is safe here — spansToViewModel expects completed spans only.
       arrows.push({
         kind: "observed",
         id: `${span.spanId}-ret`,
         fromParticipantId: targetParticipant.id,
         toParticipantId: sourceParticipant.id,
         style: "dashed",
-        label: returnLabel,
+        label: span.name,
         timeNs: span.endTimeUnixNano,
         spanId: span.spanId,
       });
@@ -177,6 +123,15 @@ export function spansToViewModel(entries: ReadonlyArray<SpanEntry>): ViewModel {
           spanId: span.spanId,
         });
       }
+
+      actionNodes.push({
+        kind: "observed",
+        id: span.spanId,
+        participantId: targetParticipant.id,
+        label: span.name,
+        timeNs: span.startTimeUnixNano,
+        spanId: span.spanId,
+      });
     } else {
       ensureParticipant(targetParticipant);
       actionNodes.push({

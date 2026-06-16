@@ -220,14 +220,26 @@ try {
   assert(sharedTraceId !== undefined, "no single traceId shared across all 3 services");
 
   // ── agentic loop span structure ──────────────────────────────────────────
-  // Expected span tree (agent-a emits both LLM turns):
-  //   orchestrator.run  (SERVER)
-  //     └─ chat claude-opus-4-8  (CLIENT, turn 1 — decides to search)
-  //          └─ tool.web_search  (INTERNAL — executes search)
-  //     └─ chat claude-opus-4-8  (CLIENT, turn 2 — incorporates result)
+  // Expected span tree with service wrapper spans:
+  //   orchestrator.run  (SERVER, service=orchestrator)
+  //     └─ agent-a.process  (SERVER, service=agent-a)
+  //          └─ chat claude-opus-4-8  (CLIENT, turn 1)
+  //               └─ agent-b.tool  (SERVER, service=agent-b)
+  //                    └─ tool.web_search  (INTERNAL)
+  //          └─ chat claude-opus-4-8  (CLIENT, turn 2)
 
   const traceSpans = collected.filter((e) => e.span.traceId === sharedTraceId);
   const spanById = new Map(traceSpans.map((e) => [e.span.spanId, e.span]));
+
+  const orchestratorSpanEntry = traceSpans.find((e) => e.span.name === "orchestrator.run");
+  assert(orchestratorSpanEntry !== undefined, "missing orchestrator.run span");
+
+  const agentAProcessEntry = traceSpans.find((e) => e.span.name === "agent-a.process");
+  assert(agentAProcessEntry !== undefined, "missing agent-a.process span");
+  assert(
+    agentAProcessEntry.span.parentSpanId === orchestratorSpanEntry.span.spanId,
+    `agent-a.process parent should be orchestrator.run, got '${spanById.get(agentAProcessEntry.span.parentSpanId ?? "")?.name}'`,
+  );
 
   const chatSpans = traceSpans.filter((e) => e.span.name === "chat claude-opus-4-8");
   assert(
@@ -235,24 +247,24 @@ try {
     `expected ≥2 'chat claude-opus-4-8' spans (LLM turn 1 + turn 2), got ${chatSpans.length}`,
   );
 
+  const chatChildrenOfAgentAProcess = chatSpans.filter(
+    (e) => e.span.parentSpanId === agentAProcessEntry.span.spanId,
+  );
+  assert(
+    chatChildrenOfAgentAProcess.length >= 2,
+    `expected ≥2 'chat claude-opus-4-8' direct children of agent-a.process, got ${chatChildrenOfAgentAProcess.length}`,
+  );
+
+  const agentBToolEntry = traceSpans.find((e) => e.span.name === "agent-b.tool");
+  assert(agentBToolEntry !== undefined, "missing agent-b.tool span");
+
   const toolSpanEntry = traceSpans.find((e) => e.span.name === "tool.web_search");
   assert(toolSpanEntry !== undefined, "missing tool.web_search span");
 
   const toolParentName = spanById.get(toolSpanEntry.span.parentSpanId ?? "")?.name;
   assert(
-    toolParentName === "chat claude-opus-4-8",
-    `tool.web_search parent should be 'chat claude-opus-4-8', got '${toolParentName}'`,
-  );
-
-  const orchestratorSpanEntry = traceSpans.find((e) => e.span.name === "orchestrator.run");
-  assert(orchestratorSpanEntry !== undefined, "missing orchestrator.run span");
-
-  const chatChildrenOfOrchestrator = chatSpans.filter(
-    (e) => e.span.parentSpanId === orchestratorSpanEntry.span.spanId,
-  );
-  assert(
-    chatChildrenOfOrchestrator.length >= 2,
-    `expected ≥2 'chat claude-opus-4-8' direct children of orchestrator.run (LLM turn 1 + turn 2), got ${chatChildrenOfOrchestrator.length}`,
+    toolParentName === "agent-b.tool",
+    `tool.web_search parent should be 'agent-b.tool', got '${toolParentName}'`,
   );
 
   // ── code.* attribute round-trip ─────────────────────────────────────────
